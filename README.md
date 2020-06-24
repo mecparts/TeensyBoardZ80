@@ -101,7 +101,7 @@ WordStar(tm) equivalents. Suddenly, *everything* that used the ZCPR TCAP
 knew about all those extra keys. That was incredibly handy. Also, it took
 no space at in the Z80's 64K.
 
-[And colour graphics too](images/10%20-%20graphics.jpg)
+![And colour graphics too](images/10%20-%20graphics.jpg)
 
 The TeensyBoard/Z80 also implements the GSX (Graphics System Extension)
 BDOS call, but without the overhead of having GSX.SYS and a device
