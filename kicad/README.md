@@ -2,7 +2,7 @@
 
 ## Schematic
 
-![Schematic](TeensyBoardZ80.png "Schematic")
+![Schematic](TeensyBoardZ80.sch.png "Schematic")
 
 I've been asked "why didn't you use a Teensy 4.1 with the built in uSD
 holder?" The simple answer is that I designed this before the 4.1 was
