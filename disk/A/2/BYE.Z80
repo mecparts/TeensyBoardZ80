@@ -1,0 +1,42 @@
+	org	100h
+bdos	equ	5
+strout	equ	9
+
+cr	equ	13
+lf	equ	10
+esc	equ	27
+
+	org	100h
+
+	ld	c,strout
+	ld	de,msg
+	call	bdos
+	ld	hl,(1)
+	dec	hl
+	dec	hl
+	dec	hl
+	jp	(hl)
+
+msg:	db	esc,'[2J',esc,'[?25l'
+	db	cr,lf
+	db	cr,lf
+	db	cr,lf
+	db	cr,lf
+	db	cr,lf
+	db	cr,lf
+	db	cr,lf
+	db	cr,lf
+	db	'             '
+	db	'Remember to turn the computer, terminal and modem off!',cr,lf
+	db	cr,lf
+	db	cr,lf
+	db	cr,lf
+	db	'                          '
+	db	'Terminating TeensyBoard/Z80',cr,lf
+	db	cr,lf
+	db	'                                   '
+	db	'CPU Halted',cr,lf,'$'
+	
+	end
+
+

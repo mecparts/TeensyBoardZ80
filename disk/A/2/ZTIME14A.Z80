@@ -1,0 +1,686 @@
+	.Z80
+	CSEG
+; ZTIME.Z80
+;
+; A hardware independent clock utility for setting or displaying the
+; date and time under ZSDOS.
+;
+Vers	equ	14
+SubVers	equ	'a'
+;
+; USAGE:
+;
+;	ZTIME {{mm}/{dd}/{yy}} {{hh}:{mm}:{ss}}
+;
+; or
+;
+;	ZTIME {{/}option}
+;
+; If no parameters are given on the command line, the current date and
+; time will be displayed.
+;
+; Entering all elements of a date or time specification is not
+; necessary.  Missing elements will be filled in from the current
+; setting of the clock.  In other words, if you just want to change
+; the hour--perhaps to daylight saving time--enter:
+;	ZTIME hh:
+; To adjust the minutes, use:
+;	ZTIME :mm
+; Or to tweek the seconds:
+;	ZTIME ::ss
+; The date parameter works the same way.  As the examples indicate,
+; leading delimiters are required, but trailing delimiters are not,
+; except for the hour if no date delimiters are used:
+;	ZTIME mm
+; will set the month, but a trailing delimiter is not needed for
+; the hour if entered with a date delimiter:
+;	ZTIME / hh
+;
+; If desired, date entry can be configured to use European format:
+;	ZTIME dd.mm.yy
+; See the EURDAT configuration byte below.
+;
+; OPTIONS:  An option may be given, instead of a date and time string,
+; with or without a leading slash.
+;
+;	S	Set clock interactively.
+;
+;	C	Show time continuously.
+;
+;	M	Store date and time in memory registers.
+;
+;	E	Show elapsed time since last call with M option.
+;
+; CUSTOM CLOCKS:  For ZSDOS clock modules that do not support setting the
+; system clock, it is possible to write a clock setting module for a specific
+; clock, which can then be easily linked into ZTIME with a single changes in
+; this source code.
+;	1. Set "CUSTOM" equate below to "TRUE".
+;	2. The public entry point of the module must be labelled "SETCUS".
+;	3. ZTIME will call the module with the address of the date and
+;	   time string in HL.  The string is in standard format of 6
+;	   packed BCD bytes:
+;		year mon day hour min sec
+;	4. Your module must return with the zero flag reset (NZ) on
+;	   error.  The zero flag is set (Z) if everything is okay.
+;	   No registers need be preserved.
+;	5. Link your SETCUS.REL module to ZTIME.REL before the libraries
+;	   are searched.
+;
+; HISTORY:
+;
+; Version 1.4 -- October 9, 1991 -- Gene Pizzetta
+;	Howard Goldstein fixed a couple of bugs in the ZSLIB parser, so
+;	a new linkage of ZTIME was necessary.  While I was at it I
+;	implemented a suggestion from Biff Bueffel that ZTIME re-read
+;	the clock after setting it, rather than just displaying the time
+;	it was supposed to be setting.  Added type 3 and 4 linkages.
+;
+; Version 1.3 -- September 10, 1991 -- Gene Pizzetta
+;	Buffer address was not being saved between calls to TLINE in the
+;	ITIME interactive time entry routine (reported by Biff Bueffel).
+;
+; Version 1.2 -- August 23, 1991 -- Gene Pizzetta
+;	The only change here is that ZTIME observes the wheel byte and
+;	declines to set the clock for non-wheels.  Everything else works
+;	for both wheels and non-wheels.  This was another suggestion from
+;	Howard Goldstein, who seems to be full of ideas these days.
+;
+; Version 1.1 -- August 18, 1991 -- Gene Pizzetta
+;	Howard Goldstein suggested that the instructions for installing
+;	a custom time-setting module did not work.  They didn't.  In
+;	addition ZSLIB 3.1 is required for re-assembly.  Thanks, Howard.
+;
+; Version 1.0 -- August 11, 1991 -- Gene Pizzetta
+;	Initial release for ZSDOS and Z3PLUS.
+; 
+FALSE	equ	0
+TRUE	equ	NOT FALSE
+;
+CUSTOM	equ	FALSE		; TRUE for custom time setting module
+;
+y	equ	TRUE
+n	equ	FALSE
+;
+; System addresses
+;
+Bdos	equ	0005h
+CpmFcb	equ	5Ch
+CpmDma	equ	80h
+;
+; ASCII
+;
+CtrlC	equ	03h
+BELL	equ	07h
+BS	equ	08h
+TAB	equ	09h
+LF	equ	0Ah
+CR	equ	0Dh
+;
+	.request	zslib,z3lib,syslib
+;
+	extrn	isbcd,isbcdt,pahc,pafhc,phl4dc,binbcd,jbcd2bn	; ZSLIB 3.1
+	extrn	tline,pwday1,parsdt,pdats1,ptimx6,eatspc
+	extrn	gcomnam,comnam,bdostyp,cpmver
+;
+	extrn	gettim,settim
+;
+	extrn	z3init,getmsg,getwhl				; Z3LIB
+;
+	extrn	cout,eprint,epstr,eval10,eval16,isdigit,pa2hc	; SYSLIB
+	extrn	phl4hc,crlf,cin,condin
+;
+; TYP3HDR.Z80, Version 1.1
+; This code has been modified as suggested by Charles Irvine so that it will
+; function correctly with interrupts enabled.
+;
+	db	'Z3ENV',1	; type-1 environment
+Z3EAdr:	dw	0		; filled in by Z33
+Entry:	dw	0100H		; intended load address
+;
+; Configuration area . . .
+;
+	db	'ZTIME'		; for ZCNFG
+	db	Vers/10+'0',Vers mod 10+'0',' '
+;
+EurDat:	db	0		; 0=American date, FFh=European
+MilTim:	db	0		; 0=civilian time, FFh=military
+HldFlg:	db	0		; 0=set immediate, FFh=wait for key
+TimReg:	db	18		; 1st register for storing time
+QtFlag:	db	0		; FFh=quiet mode for M and E options
+;
+; Program begins . . .
+;
+Start:	ld	(Stack),sp	; set up stack
+	ld	sp,Stack
+	call	bdostyp		; check DOS type
+	jr	z,DosErr
+	cp	"S"
+	jr	z,Start1
+	cp	"D"
+	jr	nz,DosErr
+Start1:	ld	hl,(Z3EAdr)
+	call	z3init
+	ld	hl,DftNam
+	call	gcomnam
+	ld	hl,CpmDma+1	; check for option
+	call	eatspc
+	jp	z,NoTime	; (no, just show it)
+	push	hl		; save our pointer in DE
+	pop	de
+	cp	'/'		; a slash?
+	jr	nz,Start2	; (no, check for options)
+	inc	hl
+	ld	a,(hl)
+	cp	'/'		; a second slash?
+	jr	nz,Start2	; (no, check for options)
+	inc	hl
+	call	eatspc		; anything else on the command line?
+	jp	z,Usage		; (no, must be help request)
+	jp	CLTime		; yes, assume it's a time and date string
+;
+Start2:	cp	'C'		; continuous display
+	jp	z,CTime
+	cp	'S'		; set interactively
+	jp	z,ITime
+	cp	'E'		; elapsed time
+	jp	z,ETime
+	cp	'M'		; to registers
+	jp	z,MTime
+	jp	CLTime		; assume it's a time string
+;
+Exit:	ld	sp,(Stack)
+	ret
+;
+DosErr:	call	eprint
+	db	BELL,' ZSDOS or ZDDOS required.',0
+	jr	Exit
+;
+GetErr:	call	eprint
+	db	BELL,' Clock read error.',0
+	jr	Exit
+;
+SetErr:	call	eprint
+	db	BELL,' Clock set error.',0
+	jr	Exit
+;
+DatInv:	call	eprint
+	db	BELL,' Invalid date and time specification.',0
+	jp	Exit
+;
+NoMsg:	call	eprint
+	db	BELL,' No message buffer.',0
+	jp	Exit
+;
+MsgErr:	call	eprint
+	db	BELL,' Invalid time in message buffer.',0
+	jp	Exit
+;
+NoWhl:	call	eprint
+	db	BELL,' Setting clock not allowed.',0
+	jp	Exit
+;
+; NoTime -- no date and time or option on command line, so we're just
+; displaying.
+;
+NoTime:	call	GTime		; get time
+	call	DTime		; show it
+	jp	Exit
+;
+; CLTime -- new date and time is on the command line
+;
+CLTime:	call	getwhl		; check wheel byte
+	jp	z,NoWhl		; (not a wheel)
+	call	GTime
+	ex	de,hl		; HL=cmd line pointer from above
+	ld	de,DatBuf
+	ld	a,(EurDat)	; date format
+	call	parsdt
+	or	a
+	jp	nz,DatInv
+DoIt:	call	STime		; set the time
+	jr	NoTime		; read time again and display it
+;
+; CTime -- display date and time continuously
+;
+CTime:	ld	b,0FFh		; first display is immediate
+CTime1:	call	GTime		; get time
+	call	condin		; abort?
+	jp	nz,Exit		; (yes)
+	ld	a,(Second)	; has second changed
+	cp	b		; last displayed second in B
+	ld	b,a
+	jr	z,CTime1	; no change, so loop
+	call	DTime		; second changed, so display new time
+	ld	a,CR
+	call	cout
+	jr	CTime1
+;
+; ITime -- set date and time interactively
+;
+ITime:	call	getwhl		; check wheel byte
+	jp	z,NoWhl		; (not a wheel)
+	ld	hl,TLBuf	; point to TLINE buffer
+	ld	b,2		; maximum characters
+	xor	a
+IMonth:	call	eprint
+	db	CR,'  Month (1-12):   ',BS,BS,0
+	call	tline		; get month
+	jp	nz,Exit		; (^C, abort)
+	call	TEval		; make BCD
+	ld	(Month),a	; save it
+	or	a		; zero?
+	jr	z,BadMth	; (not acceptable)
+	cp	13h		; greater than 12?
+	call	c,isbcd		; (no, valid BCD?)
+	jr	c,IDay		; (yes, continue)
+BadMth:	call	DoAgn		; no, try again
+	jr	IMonth
+;
+IDay:	call	crlf
+	xor	a
+IDay1:	call	eprint
+	db	CR,'    Day (1-31):   ',BS,BS,0
+	call	tline		; get day
+	jp	nz,Exit		; (^C, abort)
+	call	TEval		; make BCD
+	ld	(Day),a		; save it
+	or	a		; zero?
+	jr	z,BadDay	; (not acceptable)
+	cp	32h		; greater than 31?
+	call	c,isbcd		; (no, valid BCD?)
+	jr	c,IYear		; (yes, continue)
+BadDay:	call	DoAgn		; no, try again
+	jr	IDay1
+;
+IYear:	call	crlf
+	xor	a		; make TLINE echo
+IYear1:	call	eprint
+	db	CR,'   Year (0-99):   ',BS,BS,0
+	call	tline
+	jp	nz,Exit
+	ld	a,(hl)		; anything there?
+	call	isdigit
+	jr	nz,BadYr	; (no, try again)
+	call	TEval		; make BCD
+	ld	(Year),a
+	call	isbcd		; valid BCD?
+	jr	c,IHour		; (yes, continue)
+BadYr:	call	DoAgn		; no, try again
+	jr	IYear1
+;
+IHour:	call	crlf
+	xor	a
+IHour1:	call	eprint
+	db	CR,'Hours (0-23,+):   ',BS,BS,0
+	call	tline
+	jp	nz,Exit
+	ld	a,(hl)		; anything there?
+	cp	'+'
+	jp	z,RTime		; (get relative time)
+	call	isdigit
+	jr	nz,BadHr	; (no, try again)
+	call	TEval		; make BCD
+	ld	(Hours),a
+	cp	24h		; greater than 23?
+	call	c,isbcd		; (no, valid BCD?)
+	jr	c,IMin		; (yes, continue)
+BadHr:	call	DoAgn		; no, try again
+	jr	IHour1
+;
+IMin:	call	crlf
+	xor	a
+IMin1:	call	eprint
+	db	CR,'Minutes (0-59):   ',BS,BS,0
+	call	tline
+	jp	nz,Exit
+	ld	a,(hl)		; anything there?
+	call	isdigit
+	jr	nz,BadMin	; (no, try again)
+	call	TEval		; make BCD
+	ld	(Minute),a
+	cp	60h		; greater than 59?
+	call	c,isbcd		; (no, valid BCD?)
+	jr	c,ISec		; (yes, continue)
+BadMin:	call	DoAgn		; no, try again
+	jr	IMin1
+;
+ISec:	call	crlf
+	xor	a
+ISec1:	call	eprint
+	db	CR,'Seconds (0-59):   ',BS,BS,0
+	call	tline
+	jp	nz,Exit
+	ld	a,(hl)		; anything there?
+	call	isdigit
+	jr	nz,BadSec	; (no, try again)
+	call	TEval		; make BCD
+	ld	(Second),a
+	cp	60h		; greater than 59?
+	call	c,isbcd		; (no, valid BCD?)
+	jr	c,IEnd		; (yes, continue)
+BadSec:	call	DoAgn		; no, try again
+	jr	ISec1
+;
+RTime:	call	crlf
+	xor	a
+	ld	b,4
+RTime1:	call	eprint
+	db	CR,' Time (1-9999):   ',BS,BS,0
+	call	tline
+	jp	nz,Exit
+	ld	a,(hl)		; anything there?
+	call	isdigit
+	jr	nz,BadRT	; (no, try again)
+	push	hl		; preserve buffer pointer
+	call	eval10		; get +nnnn value to DE
+	pop	hl
+	set	7,d		; flag high bit as relative
+	ld	hl,Hours	; point to hours
+	ld	(hl),d
+	inc	hl		; point to minutes
+	ld	(hl),e
+	jr	IEnd		; continue
+BadRT:	call	DoAgn		; no, try again
+	jr	RTime1
+;
+DoAgn:	ld	a,BELL		; restart with alarm sounding
+	call	cout
+	xor	a		; make TLINE echo
+	ret
+;
+IEnd:	call	crlf
+	jp	DoIt		; set time and display it
+;
+TEval:	push	hl		; save buffer address
+	call	eval16		; evaluate time entry to BCD
+	pop	hl
+	ret
+;
+; MTime-- put date and time into memory registers
+;
+MTime:	call	GTime
+	call	getmsg		; get message buffer address
+	jp	z,NoMsg		; (no message buffer)
+	ld	a,(TimReg)	; get first storage register
+	add	a,30h		; add offset
+	ld	e,a
+	ld	d,0
+	add	hl,de
+	ex	de,hl		; register address in DE
+	ld	hl,DatBuf	; point to date and time buffer
+	ld	bc,6		; six bytes to move
+	ldir
+	ld	a,(QtFlag)
+	or	a
+	call	z,DTime
+	jp	Exit
+;
+; ETime -- track and display elapsed time
+;
+ETime:	call	GTime		; get current time
+	ld	a,(QtFlag)
+	or	a
+	call	z,DTime
+	call	z,crlf
+	call	getmsg
+	jp	z,NoMsg
+	ld	a,(TimReg)
+	add	a,30h
+	ld	e,a
+	ld	d,0
+	add	hl,de
+	call	isbcdt		; check validity of memory date and time
+	jp	nz,MsgErr
+	inc	hl		; point to previous time
+	inc	hl
+	inc	hl
+	ld	de,Elapse
+	ld	a,(hl)		; old hours
+	call	BcdBin
+	ld	(de),a
+	inc	hl
+	inc	de
+	ld	a,(hl)		; old minutes
+	call	BcdBin
+	ld	(de),a
+	inc	hl
+	inc	de
+	ld	a,(hl)		; old seconds
+	call	BcdBin
+	ld	(de),a
+	ld	hl,Hours
+	ld	a,(hl)		; new hours
+	call	BcdBin
+	ld	(hl),a
+	inc	hl
+	ld	a,(hl)		; new minutes
+	call	BcdBin
+	ld	(hl),a
+	inc	hl
+	ld	a,(hl)		; new seconds
+	call	BcdBin
+	ld	(hl),a
+	ld	a,(de)		; DE = address of Julian (old time)
+	ld	b,a
+	ld	a,(hl)		; HL = address of Second (new time)
+	sub	b
+	jr	nc,ETime1
+	call	AdjSc
+	sub	b
+;
+ETime1:	ld	(elapse+2),a
+	dec	hl		; do minute
+	dec	de
+	ld	a,(de)
+	ld	b,a
+	ld	a,(hl)
+	sub	b
+	jr	nc,ETime2
+	call	AdjMn
+	sub	b
+ETime2:	ld	(elapse+1),a
+	dec	hl		; do hour
+	dec	de
+	ld	a,(de)
+	ld	b,a
+	ld	a,(hl)
+	sub	b
+	jr	nc,ETime3
+	call	AdjHr
+	sub	b
+ETime3:	ld	(elapse),a
+;
+	call	eprint
+	db	' Elapsed time:  ',0
+	ld	hl,elapse	; show elapsed time
+	ld	a,(hl)
+	call	binbcd
+	call	pa2hc
+	ld	a,':'
+	call	cout
+	inc	hl
+	ld	a,(hl)
+	call	binbcd
+	call	pa2hc
+	ld	a,':'
+	call	cout
+	inc	hl
+	ld	a,(hl)
+	call	binbcd
+	call	pa2hc
+	jp	Exit	
+;
+AdjSc:	dec	hl		; point to minute
+	ld	a,(hl)
+	or	a		; zero?
+	jr	z,AdjSc1	; (yes, adjust it)
+	dec	(hl)		; no, borrow one
+	inc	hl		; point back to second
+	ld	a,(hl)
+	add	a,60		; add borrow
+	ret
+AdjSc1:	dec	hl		; point to hour
+	call	AdjHr		; borrow one
+	dec	(hl)
+	inc	hl		; point to minute
+	ld	(hl),59		; add borrow -1
+	inc	hl		; point back to second
+	ld	a,(hl)
+	add	a,60		; add borrow
+	ret
+;
+AdjMn:	dec	hl		; point to hour
+	ld	a,(hl)
+	or	a		; zero?
+	call	z,AdjHr		; (yes, adjust it)
+	dec	(hl)
+	inc	hl		; point back to minute
+	ld	a,(hl)
+	add	a,60		; add borrow -1
+	ret
+;
+AdjHr:	ld	a,(hl)		; is hour zero?
+	add	a,24		; add borrow from day
+	ld	(hl),a
+	ret
+;
+; Subroutines . . .
+;
+; BcdBin -- Convert BCD byte in A to binary.
+;
+BcdBin:	push	de
+	call	jbcd2bn
+	pop	de
+	ret
+;
+; GTime -- Get current time and date into buffer.
+;
+GTime:	ld	hl,DatBuf	; point to buffer
+	call	gettim		; get current time
+	jp	nz,GetErr	; (error)
+	ret
+;
+; STime -- set time and date from buffer, requesting a keypress if so
+; configured.  Allow ^C to abort program.
+;
+STime:	ld	a,(HldFlg)
+	or	a
+	jr	z,STime1
+	call	eprint
+	db	'Press any key to set date and time: ',0
+	call	cin
+	call	eprint
+	db	CR,LF,0
+	cp	CtrlC
+	jr	nz,STime1
+	call	eprint
+	db	'Aborted.',0
+	jp	Exit
+;
+STime1:	ld	hl,DatBuf
+	call	settim
+	jp	nz,SetErr
+	ret
+;
+; DTime -- Display date and time from buffer
+;
+DTime:	push	af
+	ld	a,' '
+	call	cout
+	ld	hl,DatBuf
+	call	pwday1
+	call	eprint
+	db	'  ',0
+	ld	a,(EurDat)
+	call	pdats1
+	call	eprint
+	db	'  ',0
+	ld	a,(MilTim)
+	call	ptimx6
+	pop	af
+	ret
+;
+; Usage -- Smart usage screen
+;
+Usage:	call	eprint
+DftNam:	db	'ZTIME    Version '
+	db	Vers/10+'0','.',Vers mod 10+'0',SubVers
+	db	'   (loaded at ',0
+	ld	hl,(Entry)
+	call	phl4hc	
+	call	eprint
+	db	'h)',CR,LF
+	db	'Displays ',0
+	call	getwhl
+	jr	z,Usage1
+	call	eprint
+	db	'or sets ',0
+Usage1:	call	eprint
+	db	'ZSDOS'
+ 	db	' date and time.',CR,LF
+	db	'Usage:',CR,LF
+	db	'   ',0
+	call	getwhl
+	jr	z,Usage3
+	ld	hl,comnam
+	call	epstr
+	ld	hl,AmrUse
+	ld	a,(EurDat)
+	or	a
+	jr	z,Usage2
+	ld	hl,EurUse
+Usage2:	call	epstr
+	call	eprint
+	db	'{yy}} {{hh}:{mm}:{ss}}',CR,LF
+	db	'sets clock, or',CR,LF
+	db	'   ',0
+Usage3:	ld	hl,comnam
+	call	epstr
+	call	eprint
+	db	' {{/}option}',CR,LF
+	db	'Options:',CR,LF
+	db	'   C   Show date and time continuously',CR,LF,0
+	call	getwhl
+	jr	z,Usage4
+	call	eprint
+	db	'   S   Set date and time interactively',CR,LF,0
+Usage4:	call	eprint
+	db	'   M   Store date and time in memory registers ',0
+	ld	a,(TimReg)	; get starting register
+	ld	b,a		; save it in B
+	call	binbcd		; convert it to BCD
+	call	pafhc		; ..and print it
+	ld	a,'-'
+	call	cout
+	ld	a,b		; get back starting register
+	add	a,5		; it takes six registers
+	call	binbcd
+	call	pafhc		; print last register
+	call	eprint
+	db	CR,LF
+	db	'   E   Show elapsed time since using option M',CR,LF
+	db	'If no date and time string or option is given,',CR,LF
+	db	'the current date and time is displayed.'
+	db	0
+	jp	Exit
+;
+AmrUse:	db	' {{mm}/{dd}/',0
+EurUse:	db	' {{dd}.{mm}.',0
+;
+; Uninitialized storage
+;
+Elapse:	ds	3		; elapsed time
+DatBuf:			; BCD time and date storage
+Year:	ds	1		; 00 - 99
+Month:	ds	1		;  1 - 12
+Day:	ds	1		;  1 - 31
+Hours:	ds	1		; 00 - 23
+Minute:	ds	1		; 00 - 59
+Second:	ds	1		; 00 - 59
+	ds	60		; stack
+Stack:	ds	2		; stack pointer storage	
+TLBuf:	ds	5		; input buff
+;
+	end	start
+

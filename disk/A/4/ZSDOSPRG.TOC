@@ -1,0 +1,89 @@
+1 Introduction ............................................... 1
+  1.1 Components of the operating system ..................... 1
+  1.2 Memory allocation ...................................... 2
+      1.2.1 Storage area of the segments ..................... 2
+      1.2.2 System page ...................................... 3
+
+2 BDOS functions ............................................. 6
+  2.1 Character I/O .......................................... 6
+  2.2 Disk I/O ............................................... 6
+  2.3 Control and status ..................................... 7
+
+3 ZSDOS data structures ...................................... 8
+  3.1 General ................................................ 8
+  3.2 Logical record ......................................... 8
+  3.3 File Control Block (FCB) ............................... 8
+  3.4 Directory Record ....................................... 10
+  3.5 Disk Allocation Vector ................................. 11
+  3.6 Disk Parameter Block ................................... 11
+  3.7 Dates .................................................. 12
+  3.8 Stamp format ........................................... 12
+
+4 ZSDOS programming conventions .............................. 14
+  4.1 General ................................................ 14
+  4.2 Reentrancy in ZSDOS calls .............................. 16
+  4.3 ZSDOS configuration area ............................... 17
+      4.3.1 Error vector table ............................... 18
+      4.3.2 Path address (ZSDOS only) ........................ 18
+      4.3.3 Address of the wheel byte ........................ 18
+      4.3.4 Configuration byte ............................... 18
+      4.3.5 Date vectors ..................................... 20
+  4.4 Routines to support time and date stamps ............... 20
+
+5 ZSDOS function calls ....................................... 22
+  5.1 Description of the returned values ..................... 22
+  5.2 Functional description ................................. 23
+      Function 0 - Terminate Program ......................... 23
+      Function 1 - Console Input Byte ........................ 24
+      Function 2 - Console Output Byte ....................... 25
+      Function 3 - Reader Input .............................. 26
+      Function 4 - Punch Output .............................. 27
+      Function 5 - List Output Byte .......................... 28
+      Function 6 - Direct Console I/O ........................ 29
+      Function 7 - Get IOBYTE ................................ 31
+      Function 8 - Set IOBYTE ................................ 32
+      Function 9 - Console Output String ..................... 33
+      Function 10 - Console Input Line ....................... 34
+      Function 11 - Console Status Check ..................... 36
+      Function 12 - Get System Identification ................ 37
+      Function 13 - Reset All Drives ......................... 38
+      Function 14 - Select Drive ............................. 39
+      Function 15 - Open Existing File ....................... 40
+      Function 16 - Close Output File ........................ 42
+      Function 17 - Search for First Entry ................... 43
+      Function 18 - Search for Next Entry .................... 45
+      Function 19 - Delete File .............................. 46
+      Function 20 - Sequential Read .......................... 47
+      Function 21 - Sequential Write ......................... 48
+      Function 22 - Make New File ............................ 49
+      Function 23 - Rename File .............................. 50
+      Function 24 - Get Active Drive Map ..................... 51
+      Function 25 - Get Default Drive Number ................. 52
+      Function 26 - Set File Buffer Address .................. 53
+      Function 27 - Get Allocation Vector .................... 54
+      Function 28 - Write protect drives ..................... 55
+      Function 29 - Get Read-Only Map ........................ 56
+      Function 30 - Set File Attributes ...................... 58
+      Function 31 - Get Disk Parameters ...................... 59
+      Function 32 - Get or Set User Area ..................... 60
+      Function 33 - Direct Access Read ....................... 61
+      Function 34 - Direct Access Write ...................... 62
+      Function 35 - Get File End Address ..................... 63
+      Function 36 - Get Random Address ....................... 64
+      Function 37 - Reset Drives ............................. 65
+      Function 39 - Get Vector of Fixed Disks ................ 66
+      Function 40 - Direct Access Write with Zero Fill ....... 67
+      Function 45 - Set BDOS Error Mode ...................... 68
+      Function 47 - Get File Buffer Address .................. 71
+      Function 48 - Get BDOS Version Number .................. 72
+      Function 98 - Get System Time .......................... 73
+      Function 99 - Set System Time .......................... 74
+      Function 100 - Get Configuration Flags ................. 75
+      Function 101 - Set Configuration Flags ................. 76
+      Function 102 - Get Date Stamp .......................... 77
+      Function 103 - Set Date Stamp .......................... 78
+
+Quick overview of the functions of ZSDOS ..................... 79
+Overview of the BDOS error codes ............................. 80
+Brief overview of the BIOS functions ......................... 81
+

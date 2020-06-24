@@ -1,0 +1,482 @@
+	.Z80
+;
+	.REQUEST VLIB
+	.REQUEST Z3LIB
+	.REQUEST DSLIB
+	.REQUEST SYSLIB
+;
+	EXTRN	Z3VINIT,STNDOUT,STNDEND
+	EXTRN	BCD2BIN
+	EXTRN	PRINT,COUT,CRLF,ISDIGIT,ISSP,CAPS
+;
+_getTime	EQU	98
+;
+CR	EQU	13
+LF	EQU	10
+TAB	EQU	9
+BELL	EQU	7
+;
+BIOS	EQU	0
+BDOS	EQU	5
+DMAaddr	EQU	0080H
+;
+	DB	'Z3ENV'
+	DB	1
+z3env:	DW	0
+
+start:
+	LD	(savesp),SP
+	LD	SP,stack
+	CALL	Z3VINIT
+	JP	main
+
+help:
+	CALL	print
+	DB	'Z-CALENDAR, Version 2.0',CR,LF
+	DB	'Copyright (C) 1988 Carson Wilson',CR,LF
+	DB	'  Syntax:',CR,LF
+	DB	TAB,'CAL //',TAB,TAB,'- Help',CR,LF
+	DB	TAB,'CAL',TAB,TAB,'- Draw current month',CR,LF
+	DB	TAB,'CAL month year',TAB,'- Draw specified month',CR,LF
+	DB	TAB,TAB,'month',TAB,'= 1-12 or Jan-Dec',CR,LF
+	DB	TAB,TAB,'year',TAB,'= 1-99 or 1766-2499'
+	DB	0
+done:
+	CALL	CRLF
+	LD	SP,(savesp)
+	RET
+
+main:
+	XOR	A			; zero out day
+	LD	(tmDay),A		; (so no day hilited if command tail)
+	CALL	CRLF
+	LD	HL,DMAaddr
+	LD	E,(HL)
+	LD	D,0
+	INC	HL
+	EX	DE,HL			; DE points to start of cmd tail
+	ADD	HL,DE
+	LD	(HL),0			; put a NUL at the end of the cmd tail
+	CALL	SKPSPC
+	JR	NC,DoTail		; there was a cmd tail, process it
+	LD	DE,tmYear		; no cmd tail, get system time
+	LD	C,_getTime
+	CALL	BDOS
+	DEC	A
+	JR	Z,gotTime
+	CALL	print
+	DB	BELL,'No clock',CR,LF,LF,0
+	JP	help
+
+gotTime:
+	LD	A,(tmYear)		; convert 2 digit BCD year to 
+	CALL	BCD2BIN			; absolute binary year
+	LD	L,A
+	LD	H,0
+	LD	BC,2000
+	ADD	HL,BC
+	LD	(YEAR),HL
+	LD	A,(tmMon)		; convert 2 digit BCD month to binary
+	CALL	BCD2BIN
+	LD	(MONTH),A
+	LD	D,0
+	LD	E,A			; DE has binary month
+	JP	L02B0
+
+DoTail:
+	CALL	isdigit
+	JR	NZ,DoMonName
+	CALL	EVAL10			; get month #
+	JR	C,ShowHelp
+	CALL	ISSP
+	JR	NZ,ShowHelp
+	LD	A,H
+	OR	A
+	JR	NZ,ShowHelp		; out of range [1..12]
+	LD	A,L
+	CP	12+1
+	JR	NC,ShowHelp		; out of range [1..12]
+	JR	R0278
+
+ShowHelp:
+	JP	help
+
+DoMonName:
+	LD	HL,Months
+	CALL	MatchMonth
+	JR	Z,ShowHelp
+	PUSH	AF			; save month #
+	CALL	SKPNSP			; skip rest of month name
+	POP	AF
+R0278:
+	PUSH	AF			; save month #
+	CALL	SKPSPC
+	CALL	NC,isdigit
+	CALL	Z,EVAL10		; get year
+	JR	C,ShowHelp
+	LD	A,H
+	OR	L
+	JR	Z,ShowHelp
+	EX	DE,HL
+	LD	HL,99
+	SBC	HL,DE
+	JR	C,FullYear
+	LD	HL,2000			; 2 digit years assumed 20xx
+	ADD	HL,DE
+	EX	DE,HL
+FullYear:
+	LD	HL,1766-1
+	OR	A
+	SBC	HL,DE
+	JR	NC,ShowHelp
+	LD	HL,2499
+	OR	A
+	SBC	HL,DE
+	JR	C,ShowHelp
+	POP	AF			; restore month #
+	EX	DE,HL
+	LD	D,0
+	LD	E,A
+	LD	(MONTH),A
+	LD	(YEAR),HL
+L02B0:
+	LD	A,' '
+	CALL	COUT
+	LD	A,(MONTH)
+	DEC	A
+	LD	HL,Months
+	CALL	prtMon
+	LD	HL,(YEAR)
+	CALL	PHLFDC
+	CALL	print
+	DB	CR,LF,' Sun Mon Tue Wed Thu Fri Sat',CR,LF,0
+	LD	HL,(YEAR)
+	LD	A,(MONTH)
+	CALL	C0365
+	LD	(Jan1DOW),A	; day of week of Jan 1st???
+	PUSH	AF
+	LD	HL,(YEAR)
+	LD	A,(MONTH)
+	INC	A
+	CP	12+1
+	JR	NZ,R0303
+	LD	A,1
+	INC	HL
+R0303:
+	LD	E,A
+	CALL	C0365
+	POP	BC
+R0308:
+	ADD	A,7
+	SUB	B
+	LD	B,0
+	CP	28
+	JR	C,R0308
+	LD	C,A			; C = # of days in the month
+	LD	HL,1			; start with 1st day of month
+	LD	A,(Jan1DOW)
+	OR	A
+	JR	Z,FullWeek
+	LD	B,7			; # days remaining in first week
+PosnFirst:
+	PUSH	AF
+	PUSH	BC
+	CALL	print			; space over to 1st of month
+	DB	'    ',0
+	POP	BC
+	POP	AF
+	DEC	B
+	DEC	A
+	JR	NZ,PosnFirst
+	JR	WeekLoop
+
+FullWeek:
+	LD	B,7		; # of days in this week to print
+WeekLoop:
+	PUSH	BC
+	PUSH	HL
+	CALL	print
+	DB	'  ',0
+R0337:
+	LD	A,L		; day of month < 10 ?
+	CP	10
+	LD	A,' '
+	CALL	C,COUT		; yes, print a leading blank
+	LD	A,(tmDay)
+	CALL	BCD2BIN
+	CP	L
+	CALL	Z,STNDOUT	; hilight today
+	CALL	PHLFDC		; print day of month
+	POP	HL
+	LD	A,(tmDay)
+	CALL	BCD2BIN
+	CP	L
+	CALL	Z,STNDEND
+	INC	L		; next day of month
+	POP	BC
+	DEC	C
+	JP	Z,done
+	DJNZ	WeekLoop
+	CALL	CRLF
+	JP	FullWeek
+;------------------------
+; a = month
+; hl = year
+;
+C0365:
+	CP	3		; march - december?
+	JR	NC,R036A
+	DEC	HL		; --year for january & february
+R036A:
+	CALL	C03A9
+	LD	C,A
+	PUSH	HL
+	LD	H,B
+	LD	L,C
+	ADD	HL,HL		; x 2
+	ADD	HL,HL		; x 4
+	ADD	HL,BC		; x 5
+	SRL	H		; x 2.5
+	RR	L
+	LD	A,L
+	SRL	A
+	LD	HL,T0499-1
+	ADD	HL,DE
+	ADD	A,(HL)
+	POP	HL
+	LD	H,L
+	SRL	H
+	SRL	H
+	ADD	A,H
+	ADD	HL,HL
+R0388:
+	ADD	A,7
+	CP	L
+	JR	C,R0388
+	SUB	L
+	LD	H,B
+	LD	L,A
+	LD	C,7
+	JR	C03AB
+;-----------------------
+;
+;
+PHLFDC:
+	XOR	A
+	PUSH	AF
+R0396:
+	LD	C,10
+	CALL	C03AB
+	OR	'0'
+	PUSH	AF
+	LD	A,L
+	OR	H
+	JR	NZ,R0396
+R03A2:
+	POP	AF
+	RET	Z
+	CALL	COUT
+	JR	R03A2
+;------------------------
+;
+;	IN: HL = year
+;
+C03A9:
+	LD	C,100
+C03AB:
+	XOR	A
+	LD	B,16
+R03AE:
+	ADD	HL,HL		; 24 bit AHL = 2 * AHL
+	ADC	A,A
+	CP	C
+	JR	C,R03B5		; < 100
+	SUB	C		; >= 100, sub 100 
+	INC	HL		; and bump HL
+R03B5:
+	DJNZ	R03AE
+	RET
+;------------------------
+;
+;  In: DE -> cmd tail
+;      HL -> string table
+;
+MatchMonth:
+	LD	BC,0
+	PUSH	HL
+	PUSH	BC
+	LD	B,(HL)			; # strings to search
+R03BE:
+	PUSH	DE			; save cmd tail ptr
+	LD	C,0FFH
+R03C1:
+	INC	HL
+	INC	C
+	LD	A,(DE)			; char from cmd tail
+	INC	DE
+	CP	'a'
+	CALL	NC,CAPS
+	XOR	(HL)			; compare to month char
+	JR	Z,R03C1
+	XOR	80H
+	JR	NZ,R03E2
+	INC	C
+	LD	A,(DE)
+	CALL	ISSP
+	JR	NZ,R03E2		; end of month name?
+	POP	DE			; restore ptr to month name in cmd tail
+	POP	HL
+	POP	HL
+	LD	A,(HL)
+	SUB	B
+	INC	A
+	LD	B,A
+	OR	A
+	SCF
+	RET
+
+R03E2:
+	LD	A,(HL)
+	INC	HL
+	ADD	A,A
+	JR	NC,R03E2		; find end of string (hi bit set)
+	DEC	HL
+	DEC	DE
+	LD	A,(DE)
+	POP	DE
+	CALL	ISSP
+	JR	NZ,R03FC
+	EX	(SP),HL
+	LD	A,C
+	CP	L
+	JR	C,R03FB
+	LD	H,0
+	JR	Z,R03FB
+	LD	H,B
+	LD	L,C
+R03FB:
+	EX	(SP),HL
+R03FC:
+	DJNZ	R03BE
+	POP	BC
+	POP	HL
+	LD	A,B
+	OR	A
+	RET	Z
+	LD	A,(HL)
+	SUB	B
+	INC	A
+	LD	B,A
+	RET
+;------------------------
+;
+;
+EVAL10:
+	LD	HL,0			; running sum
+EVL10L:
+	LD	A,(DE)			; get digit
+	SUB	'0'
+	CP	10
+	LD	A,(DE)
+	RET	NC			; return if not a digit
+	LD	B,H
+	LD	C,L
+	ADD	HL,HL			; running sum x 2
+	RET	C
+	ADD	HL,HL			; running sum x 4
+	RET	C
+	ADD	HL,BC			; running sum x 5
+	RET	C
+	ADD	HL,HL			; running sum x 10
+	RET	C
+	AND	0FH
+	LD	C,A
+	LD	B,0
+	ADD	HL,BC			; add digit to running sum
+	RET	C
+	INC	DE			; point to next digit
+	JR	EVL10L
+;------------------------
+; skip leading spaces in string pointed to by DE
+;
+SKPSPL:
+	INC	DE
+SKPSPC:
+	LD	A,(DE)
+	CP	TAB
+	JR	Z,SKPSPL
+	CP	' '
+	JR	Z,SKPSPL
+	RET
+;------------------------
+; skip non space characters
+;
+SKPNSL:
+	INC	DE
+SKPNSP:
+	LD	A,(DE)
+	CP	TAB
+	RET	Z
+	CP	' '
+	RET	Z
+	JR	NC,SKPNSL
+	RET
+;------------------------
+;
+;
+prtMon:
+	CP	(HL)
+	RET	NC
+	OR	A
+	JR	Z,R0467
+R045F:
+	INC	HL
+	BIT	7,(HL)
+	JR	Z,R045F
+	DEC	A
+	JR	NZ,R045F
+R0467:
+	LD	B,23			; # spaces
+R0469:
+	INC	HL
+	LD	A,(HL)
+	CALL	COUT
+	DEC	B
+	ADD	A,A
+	JR	NC,R0469
+R046D:
+	LD	A,' '
+	CALL	COUT
+	DJNZ	R046D
+	RET
+;------------------------
+T0499:
+	DB	29,32,3,6,8,11,13,16,19,21,24,26
+Months:
+	DB	12
+	DC	'JANUARY'
+	DC	'FEBRUARY'
+	DC	'MARCH'
+	DC	'APRIL'
+	DC	'MAY'
+	DC	'JUNE'
+	DC	'JULY'
+	DC	'AUGUST'
+	DC	'SEPTEMBER'
+	DC	'OCTOBER'
+	DC	'NOVEMBER'
+	DC	'DECEMBER'
+	DB	0FFH
+
+Jan1DOW:	DB	0
+MONTH:		DB	0
+YEAR:		DB	0
+tmYear:		DB	0,0,0,0,0,0
+tmMon		EQU	tmYear+1
+tmDay		EQU	tmMon+1
+savesp:		DW	0
+		DS	60
+stack		EQU	$
+
+	END	start
+

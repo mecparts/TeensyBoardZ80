@@ -1,0 +1,387 @@
+; Program: WAIT.MAC
+; Author: Joe Griffith
+; Version: 1.2
+; Date: 22 March 1985
+
+version	equ	12
+
+; Version 1.2  22 Mar 85 - Made compatible with TM-XXXnn.ASM overlays
+; Version 1.1  21 Mar 85 - Added check for valid target time,
+;			 - updates screen only when time changes,
+;			 - checks for .ENV and TERMCAP		
+; Version 1.0  18 Mar 85 - Original
+
+;----------------------------------------------------------------
+;      WAIT is intended to do nothing but continuously read a
+; real-time clock until a specified time is reached.  At that
+; time the program returns to CP/M and executes the next command 
+; in the command-line buffer.
+;
+;      The syntax is:  WAIT <time>, where <time> is the real-time
+; at which the program will end.  <time> is in the form HH:MM:SS,
+; or HH:MM, or just HH.  Missing values will default to zero.
+
+true	equ	0ffh
+false	equ	not true
+
+;----------------------------------------------------------------
+;      Standard definitions
+
+wboot	equ	0		;warm boot address
+fcb1	equ	5Ch		;first fcb address
+tbuff	equ	80h		;address of <time> parameter
+cr	equ	13		;carriage return
+lf	equ	10		;line feed
+bell	equ	7		;ASCII bell
+esc	equ	1Bh		;ASCII escape
+cntrlc	equ	3		;control C
+
+bdos	equ	00005h
+gettime	equ	200		;NOVAdos get time call
+
+;----------------------------------------------------------------
+; external Z3LIB, VLIB, and SYSLIB routines
+
+ 	ext	z3vini,cls,at,gxymsg,gotoxy
+	ext	z3init,getcl2,en,getvid
+	ext	print,pstr,epstr,cst,capin,compb,eval10,comphd,isdigi
+
+;-----------------------------------------------------------------
+; initialize system
+
+	abs
+	org	100h
+	jp	start
+;
+	db	'Z3ENV'		;this is a ZCPR3 utility
+	db	1		;with an external environment
+z3env:	dw	00000h		;not installed yet
+
+coffmsg:db	'N'-'@','O',0	;string to turn cursor off
+conmsg:	db	'N'-'@','N',0	;string to turn cursor on
+clockid:db	'Ampro LB/Z80 Internal Clock',0
+ctime:	db	'00:00:00',0	;current time stored here
+;
+clock:	ld	de,time
+	ld	c,gettime
+	call	bdos
+	inc	de
+	inc	de		; point to hours
+	ld	a,(de)		; get hours count
+	call	bcdasc		; convert to ASCII
+	ld	(ctime),bc	; save seconds
+	inc	de
+	ld	a,(de)		; get minutes count
+	call	bcdasc		; convert to ASCII
+	ld	(ctime+3),bc	; save minutes
+	inc	de
+	ld	a,(de)		; get hours
+	call	bcdasc		; convert to ASCII
+	ld	(ctime+6),bc	; save hours
+	ret
+;
+bcdasc:	ld	c,a		; save bcd value
+	and	0fh		; mask off lo nibble
+	or	'0'		; convert to ASCII
+	ld	b,a		; store
+	ld	a,c		; restore bcd value
+	rrca			; rotate hi nibble
+	rrca			; to lo position
+	rrca
+	rrca
+	and	0fh		; mask off hi nibble
+	or	'0'		; convert to ASCII
+	ld	c,a		; store
+	ret
+;
+time:	ds	5
+;
+start:	ld	hl,z3env
+	ld	a,(hl)		;get first byte of env address
+	or	a,a		;set flags
+	jr	nz,start1	;there is something in the address
+	inc	hl		;bump the pointer
+	ld	a,(hl)		;get other half of env address
+	or	a,a		;set flags
+	jp	z,noenv		;end this farce
+start1:	ld	hl,(z3env)	;get the environment address
+	call	z3init
+	call	getvid		;check for a termcap
+	jp	z,notcap	;end it again
+	ld	hl,(z3env)	;get environment address again
+	call	z3vini
+
+; program starts here, print heading then check for just 'help' request
+
+begin:	call 	cls		;clear the screen
+	call	gxymsg
+	db	1,31
+	db	'WAIT  Version '
+	db	(version/10)+'0','.',(version mod 10)+'0'
+	db	0
+  	ld	hl,clockid	;point to clock identification
+	ld	bc,0		;zero out BC for counter
+count:	ld	a,(hl)		;get a character
+	inc	hl		;bump the pointer
+	inc	bc		;bump the counter
+	or	a,a		;is it a null (end of string)?
+	jr	nz,count	;loop if not end of string
+	ld	a,18		;put length of 'config' string in a
+	add	a,c		;add length of id to it
+	rrca			;rotate it to divide by 2
+	and	a,7Fh		;insure the high bit is a zero
+	ld	b,a		;store it for a minute
+	ld	a,40		;load half the screen width
+	sub	a,b		;subtract half the string length
+	ld	l,a		;store it in the column register
+	ld	h,2		;store row number 2
+	call	gotoxy		;and print it (whew)
+	call	print
+	db	'Configured for -> '
+	db	0
+	ld	hl,clockid	;point to clock id string
+	call	pstr		;and print it on row 2		
+
+	ld	de,fcb1+1	;pt to first char of first param
+	ld	a,(de)		;get the character
+	cp	a,'/'		;help?
+	jp	z,prthlp	;if slash then print help
+	cp	a,' '		;also help?
+	jp	z,prthlp	;if blank then print help
+	cp	a,'?'		;also help?
+	jp	z,prthlp	;if question mark then print help
+
+; not help so get the target time parameter and store it
+
+	ld	hl,tbuff+2	;point to time parameter
+	ld	de,ttime	;point to target time location
+	call	move		;move until null encountered
+
+	call	gxymsg
+	db	6,17
+	db	'Next command will be executed at -> '
+	db	0
+	ld	hl,ttime	;address of target time string
+	call	pstr		;print target time.
+
+; check the target time for less than 23:59:59
+
+	ld	hl,httime	;point to hours
+	call	eval10		;evaluate to a value in DE
+	ld	hl,23		;load the maximum hour value
+	call	comphd		;compare HL and DE
+	jp	c,badtime	;too many hours
+	ld	hl,mttime	;pointo minutes
+	call	eval10		;evaluate to a value in DE
+	ld	hl,59		;load the maximum minute value
+	call	comphd		;compare HL and DE
+	jp	c,badtime	;too many minutes
+	ld	hl,sttime	;poin to seconds
+	call	eval10		;evaluate to a value in DE
+	ld	hl,59		;load the maximum second value
+	call	comphd		;compare HL and DE
+	jp	c,badtime	;too many seconds
+
+; check for digits and colons
+
+	ld	hl,ttime	;point to target time
+	ld	a,(hl)		;get first char
+	call	isdigi
+	jp	nz,badtime
+	inc	hl
+	ld	a,(hl)		;get second char
+	call	isdigi
+	jp	nz,badtime
+	inc	hl
+	ld	a,(hl)		;get third char (:)
+	cp	a,':'
+	jp	nz,badtime
+	inc	hl
+	ld	a,(hl)		;get fourth char
+	call	isdigi
+	jp	nz,badtime
+	inc	hl
+	ld	a,(hl)		;get fifth char
+	call	isdigi
+	jp	nz,badtime
+	inc	hl
+	ld	a,(hl)		;get sixth char (:)
+	cp	a,':'
+	jp	nz,badtime
+	inc	hl
+	ld	a,(hl)		;get seventh char
+	call	isdigi
+	jp	nz,badtime
+	inc	hl
+	ld	a,(hl)		;get last char
+	call	isdigi
+	jp	nz,badtime
+
+; time ok... print the options
+
+	call	gxymsg
+	db	13,17
+	db	'Options:',0
+	call	gxymsg
+	db	15,20
+	db	'^C - Abort back to command level.',0
+	call	gxymsg
+	db	16,21
+	db	'D - Toggle display on and off.',0
+	call	gxymsg
+	db	17,21
+	db	'E - Execute rest of command line now.',0
+
+	call	gxymsg		
+	db	23,1
+	db	'Pending command line is: '
+	db	0
+	call	getcl2		;points HL at rest of command line
+	call	pstr		;print remainer of command line
+
+	call	gxymsg
+	db	8,30
+	db	'The current time is -> '
+	db	0
+
+;-------------------------------------------------------------------
+;     This routine turns the cursor off (if that is available) so that
+; it doesn't interfere with the current time display
+
+	ld	hl,coffmsg	;point to the string that does it
+	call	epstr		;and print that string		
+
+;--------------------------------------------------------------------
+;     This routine gets the time from the clock, and prints it
+
+getime:	call	clock		;put the current time in memory
+	ld	hl,ltime	;point to last clock read
+	ld	de,ctime	;point to current time
+	ld	b,8		;length of the two strings
+	call	compb		;compare them
+	jr	z,gtime1	;if they are the same then skip print
+	ld	hl,ctime	;point to source
+	ld	de,ltime	;point to destination
+	call	move		;move current time to last time.
+	ld	a,(display)	;get the display toggle flag
+	or	a,a		;is it reset?
+	jr	z,gtime1	;if so the skip printing time
+	call	at		;position cursor at beginning
+	db	8,53		;of current time location
+	ld	hl,ctime	;point to the current time string
+	call	pstr		;print current time
+gtime1:	call	cst		;check console for interuption
+	jr	z,keybrd	;get something from the console
+	ld	hl,ttime	;point to target time
+	ld	de,ctime	;point to current time
+	ld	b,8		;length of strings
+	call	compb		;compare them
+	jr	nz,getime	;not there yet
+
+finish:	ld	hl,conmsg	;turn cursor back on
+	call	epstr		;print it and
+
+	call	at		;position cursor to lower left
+	db	23,1
+	ret			;return to execute next command
+
+keybrd:	call	capin		;else get the character from con
+	cp	a,cntrlc	;check for a control c
+	jp	z,abort		;temporary... should abort command line
+	cp	a,'E'		;check for an execute now.
+	jr	z,finish	;go ahead with rest of command line
+	cp	a,'D'		;check for a D (dim display)
+	jr	nz,getime	;loop back if not dim
+	ld	a,(display)	;get display flag
+	or	a,a		;check for current display off
+	jr	z,son		;jump to screen on if currently off
+	xor	a,a		;zero the accumulator
+	ld	(display),a	;store it
+	call	cls		;erase the screen
+	jr	getime		;continue loop
+
+son:	inc	a		;load up a set
+	ld	(display),a	;store it
+	jp	begin		;do the whole thing over
+
+display:
+	db	1		;initialy set for screen on
+
+badtime:
+	call	gxymsg
+	db	13,25
+	db	'The target time is not valid!',0
+	call	gxymsg
+	db	14,25
+	db	'Maximum allowable target-time',0
+	call	gxymsg
+	db	15,25
+	db	'is 23:59:59.  The third and sixth',0
+	call	gxymsg
+	db	16,25
+	db	'characters must be colons, otherwise',0
+	call	gxymsg
+	db	17,25
+	db	'only digits may be used.',0
+	call	at
+	db	23,1
+
+abort:	call	getcl2		;get the address of the next command
+	xor	a,a		;zero the accumulator
+	ld	(hl),a		;store a null in the command line
+	jp	finish		;all done
+
+noenv:	call	print			;no environment so program
+	db	'NOT INSTALLED',0	;has not been installed
+	ret
+
+notcap:	call	print			;no TERMCAP
+	db	'NO TERMCAP AVAILABLE',0
+	ret
+
+;------------------------------------------------------------------
+;     This routine moves a string from the address pointed to by
+; HL to the address pointed to by DE until a null is encountered. 
+; The null is not moved.
+
+move:	ld	a,(hl)		;get a character from the source
+	or	a,a		;check for end
+	ret	z		;if so then all done
+	ldi			;otherwise store it in the dest & bump ptrs
+	jr	move		;and repeat the process
+	
+;------------------------------------------------------------------------
+; help message
+
+prthlp:	call	print
+	db	cr,lf,lf,'     This program simply reads the real-time clock'
+	db	' until the specified time'
+	db	cr,lf,'arrives. It then returns to CP/M.'
+	db	cr,lf,lf,'     The remainder of the command line will then be'
+	db	' executed.  This allows any'
+	db	cr,lf,'program to be executed automatically at the specified'
+	db	' time.'
+	db	cr,lf,lf,'     Syntax:  WAIT hh:mm:ss ; command . . .'
+	db	cr,lf,lf,'     Where ''hh:mm:ss'' is the real-time when the'
+	db	' next ''command'' will be'
+	db	cr,lf,'executed.  If :ss or :mm:ss are omitted they will'
+	db	' default to zero.'
+	db	cr,lf
+	db	0
+	ret
+
+;-------------------------------------------------------------------------
+; storage area for the target time and the current time.  target time
+; is taken from fcb1 and stored at ttime.  Current time is stored in ctime
+; before it is printed. 
+
+ttime	equ	$		;target time string is stored here
+httime	equ	ttime		;hours
+mttime	equ	httime+3		;minutes
+sttime	equ	mttime+3		;and seconds
+	db	'00:00:00',0	;initialized with colons in place	
+
+ltime:	db	'00:00:00',0	;temp storage for last clock read
+
+	end	start
+
