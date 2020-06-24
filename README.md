@@ -131,6 +131,6 @@ https://github.com/greiman/SdFat-beta with support for file attributes.
 ## Status
 
 Though the hardware and software for the Teensy Board/Z80 are in good
-shape, this repository will bea work in progress for a while. I still 
+shape, this repository will be a work in progress for a while. I still 
 have to figure out a good base set of ZCPR3.3/ZSDOS utilities to populate
 the disk image with.
