@@ -2,7 +2,7 @@
 
 The Teensy Board/Z80 is a
 [Teensy 4.0](https://www.pjrc.com/store/teensy40.html) computer running a
-ZXCPR3.3/ZSDOS variant of [RunCPM](https://github.com/MockbaTheBorg/RunCPM).
+ZCPR3.3/ZSDOS variant of [RunCPM](https://github.com/MockbaTheBorg/RunCPM).
 
 ![Teensy Board/Z80](images/01%20-%20TeensyBoardZ80.jpg "The Teensy Board/Z80")
 
