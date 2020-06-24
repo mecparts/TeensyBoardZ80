@@ -9,7 +9,7 @@ ZCPR3.3/ZSDOS variant of [RunCPM](https://github.com/MockbaTheBorg/RunCPM).
 Features:
 * 100-140MHz equivalent Z80 (RunCPM doesn't emulate cycle times - it just goes *fast*).
 * SDIO connected uSD card (about 2.5x faster than SPI) with a standard FAT file system.
-* ANSI colour terminal emaulator with [GSX](https://github.com/mecparts/pigfx)
+* ANSI colour terminal emulator with [GSX](https://github.com/mecparts/pigfx)
 graphics support. Runs on a first generation Raspberry Pi, so HDMI video
 and USB keyboards are natively supported.
 * Battery backed up real time clock.
@@ -22,12 +22,12 @@ and USB keyboards are natively supported.
 
 The PCB for the Teensy Board/Z80 fits on a VESA mount along with an
 original Raspberry Pi 1 B (rev 2). The Pi is the ANSI console used by
-the TeensyBoard/Z80.
+the Teensy Board/Z80.
 
-Along with the internal connection to the ANSI terminal, the TeensyBoard/Z80
+Along with the internal connection to the ANSI terminal, the Teensy Board/Z80
 has two vintage I/O ports: an RS-232 port with a DE-9 connector, with
 RTS/CTS handshaking, and a Centronics parallel port. The RS-232 port is
-the TTY: device in the TeensyBoard/Z80's BIOS. The parallel port is,
+the TTY: device in the Teensy Board/Z80's BIOS. The parallel port is,
 quite naturally, the LPT: device.
 
 In my setup, the RS-232 port is hooked up to a
@@ -103,10 +103,10 @@ no space at in the Z80's 64K.
 
 ![And colour graphics too](images/10%20-%20graphics.jpg "And colour graphics too")
 
-The TeensyBoard/Z80 also implements the GSX (Graphics System Extension)
+The Teensy Board/Z80 also implements the GSX (Graphics System Extension)
 BDOS call, but without the overhead of having GSX.SYS and a device
 driver loaded in the TPA. No more GSX.SYS or GENGRAF.COM! Instead,
-everything is handled in the TeensyBoard/Z80's BDOS code. Most of the heavy
+everything is handled in the Teensy Board/Z80's BDOS code. Most of the heavy
 lifting actually occurs in my modified PiGFX code running on the
 Raspberry Pi. Fast as a 115.2K serial connection is, it's way faster
 sending the start and end point of a line and letting PiGFX draw it than
@@ -119,7 +119,7 @@ working was file datestamps. My favourite editor (ZDE16) was already
 ZSDOS-aware and capable of maintaining the actual creation date of a
 file; and its backup.
 
-## Forked libraries used by TeensyBoard/Z80
+## Forked libraries used by Teensy Board/Z80
 
 * [PiGFX](https://github.com/mecparts/pigfx): a fork of 
 https://github.com/dhansel/pigfx (which is a fork of 
