@@ -1,0 +1,133 @@
+#include "pigfx_gsx.h"
+
+// open workstation REQ for CRT
+void GSX::open_workstation() {
+}
+
+// close workstation REQ for CRT
+void GSX::close_workstation() {
+}
+
+// clear workstation REQ for CRT
+void GSX::clear_workstation() {
+}
+
+// update workstation REQ for CRT
+void GSX::update_workstation() {
+}
+
+// escape REQ for CRT
+GSX::escape() {
+}
+
+// draw polyline REQ for CRT
+GSX::draw_polyline() {
+}
+			
+// plot a group of markers REQ for CRT
+GSX::draw_polymarkers() {
+}
+
+// draw text REQ for CRT
+GSX::draw_text() {
+}
+			
+// draw a filled polygon REQ for CRT
+GSX::draw_filled_polygon() {
+}
+			
+// draw bitmap REQ for CRT
+GSX::draw_bitmap() {
+}
+			
+// general drawing primitive REQ for CRT
+GSX::drawing_primitive() {
+}
+			
+// set text size REQ for CRT
+GSX::set_text_size() {
+}
+			
+// set text direction
+GSX::set_text_direction() {
+}
+			
+// set colour index (palette registers) REQ for CRT
+GSX::set_colour_palette() {
+}
+			
+// set line style REQ for CRT
+GSX::set_line_style() {
+}
+			
+// set line width
+GSX::set_line_width() {
+}
+			
+// set line colour REQ for CRT
+GSX::set_line_colour() {
+}
+			
+// set marker style REQ for CRT
+GSX::set_marker_style() {
+}
+			
+// set marker height
+GSX::set_marker_height() {
+}
+			
+// set marker colour REQ for CRT
+GSX::set_marker_colour() {
+}
+			
+// set text font
+GSX::set_text_font() {
+}
+			
+// set text colour REQ for CRT
+GSX::set_text_colour() {
+}
+			
+// set fill style
+GSX::set_fill_style() {
+}
+			
+// set fill index
+GSX::set_fill_index() {
+}
+			
+// set fill colour REQ for CRT
+GSX::set_fill_colour() {
+}
+			
+// read palette REQ for CRT
+GSX::read_colour_palette() {
+}
+
+// read bitmap
+GSX::read_bitmap() {
+}
+			
+// read locator (eg tablet or mouse)
+GSX::read_locator() {
+}
+			
+// read valuator
+GSX::read_valuator() {
+}
+			
+// read choice
+GSX::read_choice() {
+}
+			
+// read string
+GSX::read_string() {
+}
+			
+// set writing mode
+GSX::set_writing_mode() {
+}
+			
+// set input mode
+GSX::set_input_mode() {
+}

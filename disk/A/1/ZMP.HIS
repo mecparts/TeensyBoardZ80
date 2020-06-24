@@ -1,0 +1,32 @@
+		** ZMP -- Modification History **
+
+  3 December 1984	Written by Harold D. Maney as HModem
+  1 November 1987	Improved for Linda's 2400 bps modem
+  20 November 1987	Greatly improved for Linda
+  29 November 1987	Added YMODEM, ZMODEM support
+  12 May 1988		Released HModem II Ver 2.05.05 as shareware
+  15 May 1988		Released source code for HModem II
+  16 July 1988		Removed system-dependent code <rjm>
+  24 August 1988	Extensive de-bugging and conversion to Hi-Tech C
+			Renamed to ZMP in view of major changes made
+
+   4 September 1988	v1.1:	Various changes. Added user area support.
+  11 September 1988	v1.2:	Fixed a few bugs. Allow use of RZMP.
+  30 September 1988	v1.3:	Added sorted directories.
+				Will look for overlays in A0: if not in
+				   invocation drive.
+				Sends CR/LF to printer when toggled off.
+				More bug fixes and options. Forgotten what.
+   3 November 1988	v1.4:	Added file print to TERM.
+				Added auto Zmodem receive (on receipt of
+				   ZRQINIT).
+				Enabled Xon-Xoff in Zmodem transmit.
+				Added line and char delays in ASCII send.
+				User can now specify where overlays are.
+				Modified keystrokes here and there.
+				Removed title screen pause and clear screen.
+				Capture buffer only sends xon-xoff when buffer
+				   fills.
+				Added modem initialisation capability from
+				   zmterm.
+

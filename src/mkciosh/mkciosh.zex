@@ -1,0 +1,43 @@
+;; MKCIOSH ZEX build script
+;; Mar 9, 2020
+;;
+;; Get rid of leftover temporary files
+era cios.bak,cios.hex,cios.lib,0.bin,1.bin,cios.h
+;; Build MKCIOSH.COM if necessary
+if ~exist mkciosh.com
+turbo
+<yocqcmkciosh|cr|q
+fi
+;; Assemble CIOS.Z80 at 0000h
+ed cios.lib
+<i
+<	org	0
+<^Z
+<e
+zmac cios /h
+if error
+sak
+else
+;; Create the binary image at 0000h
+mload 0.bin=cios.hex
+;; Assemble CIOS.Z80 at 0100h
+era cios.lib
+ed cios.lib
+<i
+<	org	0100h
+<^Z
+<e
+zmac cios /h
+if error
+sak
+else
+;; Create the binary.image at 0100h
+mload 1.bin=cios.hex
+;; Create CIOS.H
+mkciosh 0.bin 1.bin
+fi
+fi
+;; Clean up
+era cios.bak,0.bin,1.bin,cios.hex,cios.lib
+donemsg
+

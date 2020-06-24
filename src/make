@@ -1,0 +1,2 @@
+#!/bin/bash
+/usr/share/arduino/arduino --verify --board teensy:avr:teensy40:usb=serial,speed=600,opt=o1std,keys=en-us --port /dev/ttyACM0 --preserve-temp-files --pref build.path=/home/pi/tmp RunCPM.ino
