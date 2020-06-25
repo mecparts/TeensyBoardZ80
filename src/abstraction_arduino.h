@@ -1093,13 +1093,6 @@ void _modeminit(uint16 iotab) {
 			break;
 	}
 	if (newBaud && newBaud != modemSpeed) {
-		// code specific to changing the ESP8266 virtual modem baud rate
-		MODEMPORT.print("AT$SB=");
-		MODEMPORT.print(newBaud);
-		MODEMPORT.print('\r');
-		MODEMPORT.flush();	            // wait for string to finish sending
-		delay(500);								// give the modem time to change
-		MODEMPORT.clear();
 		modemSpeed = newBaud;
 		
 		// update the Teensy's serial port
