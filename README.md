@@ -91,7 +91,7 @@ carried away.
 
 ![Yes, it really prints](images/08%20-%20printout.jpg "Yes, it really prints")
 
-![The Teensy Board online](images/09%20-%20online.jpg "The Teensy Board/Z80 online")
+![The Teensy Board/Z80 online](images/09%20-%20online.jpg "The Teensy Board/Z80 online")
 
 A couple of decades of having all those extra cursor and function keys
 on my keyboard meant that I kept reaching for them. So I added the
@@ -119,18 +119,24 @@ working was file datestamps. My favourite editor (ZDE16) was already
 ZSDOS-aware and capable of maintaining the actual creation date of a
 file; and its backup.
 
-## Forked libraries used by Teensy Board/Z80
+## Status
 
+Currently working on getting the ZMP source to compile with Hi Tech C
+v3.09.
+
+## References
+
+* [RunCPM](https://github.com/MockbaTheBorg/RunCPM): the original
+inspiration for this whole project. While RunCPM may not have been
+intended to emulate a complete CP/M computer, as the Teensy Board/Z80
+shows there's no reason that it can't be expanded into one.
 * [PiGFX](https://github.com/mecparts/pigfx): a fork of 
 https://github.com/dhansel/pigfx (which is a fork of 
 https://github.com/fbergama/pigfx) with all kinds of additions, including
 native GSX support.
 * [SdFat-beta](https://github.com/mecparts/SdFat-beta): a fork of
 https://github.com/greiman/SdFat-beta with support for file attributes.
+* [Retro WiFi Modem](https://github.com/mecparts/RetroWiFiModem): a 
+WiFi modem in the style of an old Hayes Smartmodem. True RS-232 interface
+and LED status indicators.
 
-## Status
-
-Though the hardware and software for the Teensy Board/Z80 are in good
-shape, this repository will be a work in progress for a while. I still 
-have to figure out a good base set of ZCPR3.3/ZSDOS utilities to populate
-the disk image with.
