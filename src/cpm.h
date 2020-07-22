@@ -1197,9 +1197,10 @@ void _Bdos(void) {
 			//
 			// C = 105, 200 (69h, C8h) : GetTime
 			// IN: DE = address to receive time block (5 bytes)
+			// OUT: A = seconds (emulating MP/M II)
 			//
 			_getZrDosTime(DE);
-			HL = 0;
+			HL = _RamRead(DE+4);
 			break;
 
 		case 104:	// Z80DOS
