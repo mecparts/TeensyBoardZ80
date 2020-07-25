@@ -121,13 +121,12 @@ file; and its backup.
 
 ## Status
 
-ZMP has been re-compiled with Hi Tech C v3.09 and is working. Baud rates
-above 19.2K now display properly (as do send/receive times with at those
-speeds). Keyboard macros now send CR for ! rather than CR/LF. Automatic
-CR on connection has been removed. ! and ~ can be escaped with \ in 
+Newest working: ZMP has been re-compiled with Hi Tech C v3.09 and is
+working. Baud rates above 19.2K now display properly (as do send/receive
+times with at those speeds). Timestamps are working with Ymodem and
+Zmodem. Keyboard macros now send CR for ! rather than CR/LF. Automatic
+CR on connection has been removed. ! and ~ can be escaped with \ in
 keyboard macros so those characters can be sent.
-
-Working on getting file timestamps working with Ymodem and Zmodem.
 
 ## References
 
