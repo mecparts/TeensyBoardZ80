@@ -9,7 +9,7 @@
 	#include "pigfx_gsx.h"
 #endif
 
-GSX gsx;
+GSX gsx(&TERMINALPORT);
 
 uint16 _gdos(uint16 DE) {
 	
@@ -27,8 +27,8 @@ uint16 _gdos(uint16 DE) {
 		int16 num_ptsin = gsx.contrl[CONTRL_PTSIN] < MAX_PTSIN 
 							  ? gsx.contrl[CONTRL_PTSIN] : MAX_PTSIN;
 		for (int16 i = 0; i < num_ptsin*2; i = i + 2) {
-			gsx.int_ptsin[i + 0] = gsx.ndc_to_dev(gsx.ptsin[i + 0], 0, gsx.maxX);
-			gsx.int_ptsin[i + 1] = gsx.ndc_to_dev(gsx.ptsin[i + 1], gsx.maxY, 0);
+			gsx.dev_ptsin[i + 0] = gsx.ndc_to_dev(gsx.ptsin[i + 0], 0, gsx.maxX);
+			gsx.dev_ptsin[i + 1] = gsx.ndc_to_dev(gsx.ptsin[i + 1], gsx.maxY, 0);
 		}
 	}
 	

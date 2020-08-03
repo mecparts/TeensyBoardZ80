@@ -57,7 +57,8 @@ const unsigned int xterm_colors[256] = {
 	0xeeeeee 
 };
 
-GSX::GSX() {
+GSX::GSX(HardwareSerial *_serialPort) {
+	serialPort = _serialPort;
 }
 
 void GSX::begin() {
@@ -67,13 +68,7 @@ void GSX::begin() {
 void GSX::open_workstation() {
 	close_workstation();
 
-	Serial1.print(CSI_PRIVATE);
-	Serial1.print(OPC_OPEN_WORKSTATION);
-	for (int i = 0; i < 10; ++i) {
-		Serial1.print(';');
-		Serial1.print(intin[i]);
-	}
-	Serial1.print('G');
+	send_array_params(OPC_OPEN_WORKSTATION, 10, intin, 0);
 	contrl[CONTRL_PTSOUT] = 6;		// # points in ptsout
 	
 	ptsout[0] = TW_MIN;
@@ -151,16 +146,12 @@ void GSX::open_workstation() {
 // GSX 2: close workstation REQ for CRT
 void GSX::close_workstation() {
 	clear_workstation();
-	Serial1.print(CSI_PRIVATE);
-	Serial1.print(OPC_CLOSE_WORKSTATION);
-	Serial1.print('G');
+	send_params(OPC_CLOSE_WORKSTATION, 0);
 }
 
 // GSX 3: clear workstation REQ for CRT
 void GSX::clear_workstation() {
-	Serial1.print(CSI_PRIVATE);
-	Serial1.print(OPC_CLEAR_WORKSTATION);
-	Serial1.print('G');
+	send_params(OPC_CLEAR_WORKSTATION, 0);
 }
 
 // GSX 4: update workstation REQ for CRT
@@ -169,7 +160,7 @@ void GSX::update_workstation() {
 
 // GSX 5: escape REQ for CRT
 void GSX::escape() {
-	switch (contrl[CONTROL_FUNCTIONID]) {
+	switch (contrl[CONTRL_FUNCTIONID]) {
 		
 		case ESC_GET_TEXT_ROWS_AND_COLUMNS:	// inquire addressable character cells REQ for CRT
 			contrl[CONTRL_INTOUT] = 2;
@@ -189,46 +180,28 @@ void GSX::escape() {
 		case ESC_TEXT_REVERSE_VIDEO_ON:	// reverse video on
 		case ESC_TEXT_REVERSE_VIDEO_OFF:	// reverse video off
 		case ESC_REMOVE_GRAPHIC_CURSOR:	// remove last graphic cursor REQ for CRT
-			Serial1.print(CSI_PRIVATE);
-			Serial1.print(OPC_ESCAPE);
-			Serial1.print(';');
-			Serial1.print(contrl[CONTROL_FUNCTIONID]);
-			Serial1.print('G');
+			send_params(OPC_ESCAPE, 1, contrl[CONTRL_FUNCTIONID]);
 			break;
 			
 		case ESC_SET_TEXT_CURSOR: // direct cursor address REQ for CRT
-			Serial1.print(CSI_PRIVATE);
-			Serial1.print(OPC_ESCAPE);
-			Serial1.print(';');
-			Serial1.print(ESC_SET_TEXT_CURSOR);
-			Serial1.print(';');
-			Serial1.print(intin[0]);
-			Serial1.print(';');
-			Serial1.print(intin[1]);
-			Serial1.print('G');
+			send_params(OPC_ESCAPE, 3, ESC_SET_TEXT_CURSOR, intin[0], intin[1]);
 			break;
 			
 		case ESC_TEXT:	// direct cursor addressable text REQ for CRT
 			if (contrl[CONTRL_INTIN] > 0) {
-				Serial1.print(CSI_PRIVATE);
-				Serial1.print(OPC_ESCAPE);
-				Serial1.print(';');
-				Serial1.print(ESC_TEXT);
-				Serial1.print(';');
-				Serial1.print(contrl[CONTRL_INTIN]);
-				for (uint16 i = 0; i < contrl[CONTRL_INTIN] ; ++i ) {
-					Serial1.print(';');
-					Serial1.print(intin[i]);
-				}
-				Serial1.print('G');
+				send_array_params(OPC_ESCAPE, contrl[CONTRL_INTIN], intin, 1, ESC_TEXT);
 			}
 			break;
 			
 			
 		case ESC_GET_TEXT_CURSOR:	// inquire current current cursor address REQ for CRT
 			contrl[CONTRL_INTOUT] = 2;
-			intout[0] = 0; // TODO ### getCursorY() / (TH_MIN + 1);
-			intout[1] = 0; // TODO ### getCursorX() / (TW_MIN + 1);
+			serialPort->print(CSI_PRIVATE);
+			serialPort->print(F("6n"));
+			// PiGFX returns <ESC>[rrr;cccR
+			intout[0] = serialPort->parseInt()-1;
+			intout[1] = serialPort->parseInt()-1;
+			serialPort->find("R");	// eat trailing character in escape sequence
 			break;
 			
 		case ESC_TABLET_STATUS:	// inquire tablet status
@@ -241,7 +214,7 @@ void GSX::escape() {
 			break;
 			
 		case ESC_PLACE_GRAPHIC_CURSOR:	// place graphic cursor at location REQ for CRT
-			place_graphic_cursor(int_ptsin[0], int_ptsin[1]);
+			place_graphic_cursor(dev_ptsin[0], dev_ptsin[1]);
 			break;
 			
 	}
@@ -249,38 +222,22 @@ void GSX::escape() {
 
 // GSX 6: draw polyline REQ for CRT
 void GSX::draw_polyline() {
-	int16 nPoints = contrl[CONTRL_PTSIN];
-	if (nPoints > 1) {
-		Serial1.print(CSI_PRIVATE);
-		Serial1.print(OPC_DRAW_POLYLINE);
-		Serial1.print(';');
-		Serial1.print(nPoints);
-		for (int16 i = 0; i < nPoints * 2; i += 2) {
-			Serial1.print(';');
-			Serial1.print(int_ptsin[i + 0]);
-			Serial1.print(';');
-			Serial1.print(int_ptsin[i + 1]);
-		}
-		Serial1.print('G');
-	}
+	send_array_params(
+		OPC_DRAW_POLYLINE,
+		2 * contrl[CONTRL_PTSIN],
+		dev_ptsin,
+		1,
+		contrl[CONTRL_PTSIN]);
 }
-			
+
 // GSX 7: plot a group of markers REQ for CRT
 void GSX::draw_polymarkers() {
-	int nMarkers = contrl[CONTRL_PTSIN];
-	if (nMarkers > 0) {
-		Serial1.print(CSI_PRIVATE);
-		Serial1.print(OPC_DRAW_POLYMARKER);
-		Serial1.print(';');
-		Serial1.print(nMarkers);
-		for (int16 i = 0; i < nMarkers * 2; i += 2) {
-			Serial1.print(';');
-			Serial1.print(int_ptsin[i + 0]);
-			Serial1.print(';');
-			Serial1.print(int_ptsin[i + 1]);
-		}
-		Serial1.print('G');
-	}
+	send_array_params(
+		OPC_DRAW_POLYMARKER,
+		2 * contrl[CONTRL_PTSIN],
+		dev_ptsin,
+		1,
+		contrl[CONTRL_PTSIN]);
 }
 
 // GSX 8: draw text REQ for CRT
@@ -288,19 +245,14 @@ void GSX::draw_text() {
 	uint16 nChars = contrl[CONTRL_INTIN];
 
 	if (nChars > 0) {
-		Serial1.print(CSI_PRIVATE);
-		Serial1.print(OPC_DRAW_TEXT);
-		Serial1.print(';');
-		Serial1.print(nChars);
-		Serial1.print(';');
-		Serial1.print(int_ptsin[0]);
-		Serial1.print(';');
-		Serial1.print(int_ptsin[1]);
-		for (uint16 i = 0; i < nChars ; ++i ) {
-			Serial1.print(';');
-			Serial1.print(intin[i]);
-		}
-		Serial1.print('G');
+		send_array_params(
+			OPC_DRAW_TEXT,
+			nChars,
+			intin,
+			3,
+			nChars,
+			dev_ptsin[0],
+			dev_ptsin[1]);
 	}
 }
 			
@@ -308,74 +260,64 @@ void GSX::draw_text() {
 void GSX::draw_filled_polygon() {
 	int16 nPoints = contrl[CONTRL_PTSIN];
 	if (nPoints > 2) {
-		Serial1.print(CSI_PRIVATE);
-		Serial1.print(OPC_DRAW_FILLED_POLYGON);
-		Serial1.print(';');
-		Serial1.print(nPoints);
-		for( int16 i = 0; i < nPoints * 2; i += 2) {
-			Serial1.print(';');
-			Serial1.print(int_ptsin[i + 0]);
-			Serial1.print(';');
-			Serial1.print(int_ptsin[i + 1]);
-		}
-		Serial1.print('G');
+		send_array_params(
+			OPC_DRAW_FILLED_POLYGON,
+			2 * nPoints, dev_ptsin,
+			1, nPoints);
 	}
 }
 			
 // GSX 10: draw bitmap REQ for CRT
 void GSX::draw_bitmap() {
-	// TODO
+	send_array_params(
+		OPC_DRAW_BITMAP,
+		contrl[CONTRL_INTIN], intin,	// colour index array
+		8,										// 8 values to follow
+		contrl[5],							// length of each row in intin array
+		contrl[6],							// # elements in each row in intin array
+		contrl[7],							// # rows in intin array
+		contrl[8],							// pixel operation
+		dev_ptsin[0], dev_ptsin[1],	// x,y lower left
+		dev_ptsin[2], dev_ptsin[3]);	// x,y upper right
 }
 			
 // GSX 11: general drawing primitive REQ for CRT
 void GSX::drawing_primitive() {
-	switch (contrl[CONTROL_FUNCTIONID]) {
+	switch (contrl[CONTRL_FUNCTIONID]) {
+
 		case DRAW_BAR:	// bar REQ for CRT
-			Serial1.print(CSI_PRIVATE);
-			Serial1.print(OPC_DRAWING_PRIMITIVE);
-			Serial1.print(';');
-			Serial1.print(DRAW_BAR);
-			for (int16 i = 0; i < 4; ++i) {	// llx, lly, urx, ury
-				Serial1.print(';');
-				Serial1.print(int_ptsin[i]);
-			}
-			Serial1.print('G');
+			send_array_params(
+				OPC_DRAWING_PRIMITIVE, 
+				4, dev_ptsin, 
+				1, DRAW_BAR);
 			break;
+
 		case DRAW_ARC:	// arc: drawn counter clockwise from arc_s to arc_e
-			Serial1.print(CSI_PRIVATE);
-			Serial1.print(OPC_DRAWING_PRIMITIVE);
-			Serial1.print(';');
-			Serial1.print(DRAW_ARC);
-			Serial1.print(';');
-			Serial1.print(int_ptsin[0]);	// x0
-			Serial1.print(';');
-			Serial1.print(int_ptsin[1]);	// y0
-			Serial1.print(';');
-			Serial1.print(int_ptsin[6]);	// r
-			Serial1.print(';');
-			Serial1.print(intin[0]);		// arc_s
-			Serial1.print(';');
-			Serial1.print(intin[1]);		// arc_x
-			Serial1.print('G');
-			break;
 		case DRAW_PIE_SLICE:	// pie slice
-			// TODO
+			send_params(
+				OPC_DRAWING_PRIMITIVE, 
+				6, contrl[CONTRL_FUNCTIONID], 
+				dev_ptsin[0], dev_ptsin[1],	// xy, y0
+				dev_ptsin[6], 						// r
+				intin[0], 							// arc_s
+				intin[1]);							// arc_x
 			break;
+
 		case DRAW_CIRCLE:	// circle
-			Serial1.print(CSI_PRIVATE);
-			Serial1.print(OPC_DRAWING_PRIMITIVE);
-			Serial1.print(';');
-			Serial1.print(DRAW_CIRCLE);
-			Serial1.print(';');
-			Serial1.print(int_ptsin[0]);	// x0
-			Serial1.print(';');
-			Serial1.print(int_ptsin[1]);	// y0
-			Serial1.print(';');
-			Serial1.print(int_ptsin[4]);	// r
-			Serial1.print('G');
+			send_params(
+				OPC_DRAWING_PRIMITIVE,
+				4, DRAW_CIRCLE,
+				dev_ptsin[0], dev_ptsin[1],	// x0, y0
+				dev_ptsin[4]);						// r
 			break;
+
 		case DRAW_GRAPHICS_CHAR:	// print graphic characters (ruling characters)
-			// TODO
+			send_array_params(
+				OPC_DRAWING_PRIMITIVE,
+				contrl[CONTRL_INTIN], intin,	// chars to draw
+				3, 
+				DRAW_GRAPHICS_CHAR,
+				dev_ptsin[0], dev_ptsin[1]);	// x0, y0
 			break;
 	}
 }
@@ -399,15 +341,7 @@ void GSX::set_text_height() {
 	} 
 	text_height = text_size * TH_MIN;
 	text_width = text_size * TW_MIN;
-	Serial1.print(CSI_PRIVATE);
-	Serial1.print(OPC_TEXT_HEIGHT);
-	Serial1.print(';');
-	Serial1.print(text_size);
-	Serial1.print(';');
-	Serial1.print(text_height);
-	Serial1.print(';');
-	Serial1.print(text_width);
-	Serial1.print('G');
+	send_params(OPC_TEXT_HEIGHT, 3, text_size, text_height, text_width);
 	
 	contrl[CONTRL_PTSOUT] = 2;
 	ptsout[0] = text_width;
@@ -430,12 +364,12 @@ void GSX::set_text_direction() {
 	}
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = text_direction;
-	send_parameter(OPC_TEXT_ROTATION, text_direction);
+	send_params(OPC_TEXT_ROTATION, 1, text_direction);
 }
 			
 // GSX 14: set colour index (palette registers) REQ for CRT
 void GSX::set_colour_palette() {
-	send_parameters(OPC_SET_PALETTE_COLOUR, intin, 4);
+	send_array_params(OPC_SET_PALETTE_COLOUR, 4, intin, 0);
 }
 			
 // GSX 15: set line style REQ for CRT
@@ -444,7 +378,7 @@ void GSX::set_line_style() {
 	if (line_style < LS_SOLID || line_style > LS_LONG_DASH) {
 		line_style = LS_SOLID;
 	}
-	send_parameter(OPC_POLYLINE_LINESTYLE, line_style);
+	send_params(OPC_POLYLINE_LINESTYLE, 1, line_style);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = line_style;
 }
@@ -457,7 +391,7 @@ void GSX::set_line_width() {
 	} else if (line_width > LW_MAX) {
 		line_width = LW_MAX;
 	}
-	send_parameter(OPC_POLYLINE_LINEWIDTH, line_width);
+	send_params(OPC_POLYLINE_LINEWIDTH, 1, line_width);
 	contrl[CONTRL_PTSOUT] = 1;
 	ptsout[0] = line_width;
 	ptsout[1] = 0;
@@ -466,7 +400,7 @@ void GSX::set_line_width() {
 // GSX 17: set line colour REQ for CRT
 void GSX::set_line_colour() {
 	int16 line_colour = intin[0];
-	send_parameter(OPC_POLYLINE_COLOUR, line_colour);
+	send_params(OPC_POLYLINE_COLOUR, 1, line_colour);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = line_colour;
 }
@@ -477,7 +411,7 @@ void GSX::set_marker_style() {
 	if (marker_style < MS_DOT || marker_style > MS_CROSS) {
 		marker_style = MS_ASTERISK;
 	}
-	send_parameter(OPC_POLYMARKER_STYLE, marker_style);
+	send_params(OPC_POLYMARKER_STYLE, 1, marker_style);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = marker_style;
 }
@@ -485,7 +419,7 @@ void GSX::set_marker_style() {
 // GSX 19: set marker height
 void GSX::set_marker_height() {
 	int16 marker_height = ndc_to_dev(ptsin[1], 0, maxY);
-	send_parameter(OPC_POLYMARKER_HEIGHT, marker_height);
+	send_params(OPC_POLYMARKER_HEIGHT, 1, marker_height);
 	contrl[CONTRL_PTSOUT] = 1;
 	ptsout[0] = 0;
 	ptsout[1] = marker_height;
@@ -493,59 +427,67 @@ void GSX::set_marker_height() {
 			
 // GSX 20: set marker colour REQ for CRT
 void GSX::set_marker_colour() {
-	send_parameter(OPC_POLYMARKER_COLOUR, intin[0]);
+	send_params(OPC_POLYMARKER_COLOUR, 1, intin[0]);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = intin[0];
 }
 			
 // GSX 21: set text font
 void GSX::set_text_font() {
-	send_parameter(OPC_TEXT_FONT, intin[0]);
+	send_params(OPC_TEXT_FONT, 1, intin[0]);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = intin[0];
 }
 			
 // GSX 22: set text colour REQ for CRT
 void GSX::set_text_colour() {
-	send_parameter(OPC_TEXT_COLOUR, intin[0]);
+	send_params(OPC_TEXT_COLOUR, 1, intin[0]);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = intin[0];
 }
 			
 // GSX 23: set fill style
 void GSX::set_fill_style() {
-	send_parameter(OPC_FILL_STYLE, intin[0]);
+	send_params(OPC_FILL_STYLE, 1, intin[0]);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = intin[0];
 }
 			
 // GSX 24: set fill index
 void GSX::set_fill_index() {
-	send_parameter(OPC_FILL_STYLE_INDEX, intin[0]);
+	send_params(OPC_FILL_STYLE_INDEX, 1, intin[0]);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = intin[0];
 }
 			
 // GSX 25: set fill colour REQ for CRT
 void GSX::set_fill_colour() {
-	send_parameter(OPC_FILL_COLOUR, intin[0]);
+	send_params(OPC_FILL_COLOUR, 1, intin[0]);
 }
 			
 // GSX 26: read colour palette REQ for CRT
 void GSX::read_colour_palette() {
-	uint16 clr_index = intin[0];
+	uint16 clr_index = intin[0] & 0xFF;
+	unsigned int clr = xterm_colors[clr_index];
 	if (clr_index >= NUM_COLOURS) {
 		clr_index = NUM_COLOURS - 1;
 	}
 	intout[0] = clr_index;
-	intout[1] = 0; // TODO ### map((clr >> 11), 0, 0x1F, 0, 1000);
-	intout[2] = 0; // TODO ### map(((clr >> 5) & 0x3F), 0, 0x3F, 0, 1000);
-	intout[3] = 0; // TODO ###  map((clr & 0x1F), 0, 0x1F, 0, 1000);
+	intout[1] = map((clr >> 16) & 0xFF, 0, 0xFF, 0, 1000);
+	intout[2] = map((clr >>  8) & 0xFF, 0, 0xFF, 0, 1000);
+	intout[3] = map((clr      ) & 0xFF, 0, 0xFF, 0, 1000);
 }
 
 // GSX 27: read bitmap
 void GSX::read_bitmap() {
-	// TODO
+	send_params(
+		OPC_GET_BITMAP,
+		7,										// 8 values to follow
+		contrl[5],							// length of each row in intin array
+		contrl[6],							// # elements in each row in intin array
+		contrl[7],							// # rows in intin array
+		dev_ptsin[0], dev_ptsin[1],	// x,y lower left
+		dev_ptsin[2], dev_ptsin[3]);	// x,y upper right
 }
 			
 extern uint8 _crtist(void);
@@ -553,12 +495,12 @@ extern uint8 _getcrt(void);
 
 // GSX 28: read locator (eg tablet or mouse)
 void GSX::read_locator() {
-	int16 x = int_ptsin[0];
-	int16 y = int_ptsin[1];
+	int16 x = dev_ptsin[0];
+	int16 y = dev_ptsin[1];
 	char ch;
-   
+
 	place_graphic_cursor(x, y);
-   while (true) {
+	while (true) {
 		if (_crtist()) {
 			ch = _getcrt();
 			remove_graphic_cursor();
@@ -585,23 +527,11 @@ void GSX::read_locator() {
 }
 
 void GSX::place_graphic_cursor(int16 x, int16 y) {
-	Serial1.print(CSI_PRIVATE);
-	Serial1.print(OPC_ESCAPE);
-	Serial1.print(';');
-	Serial1.print(ESC_PLACE_GRAPHIC_CURSOR);
-	Serial1.print(';');
-	Serial1.print(x);
-	Serial1.print(';');
-	Serial1.print(y);
-	Serial1.print('G');
+	send_params(OPC_ESCAPE, 3, ESC_PLACE_GRAPHIC_CURSOR, x, y);
 }
 
 void GSX::remove_graphic_cursor() {
-	Serial1.print(CSI_PRIVATE);
-	Serial1.print(OPC_ESCAPE);
-	Serial1.print(';');
-	Serial1.print(ESC_REMOVE_GRAPHIC_CURSOR);
-	Serial1.print('G');
+	send_params(OPC_ESCAPE, 1, ESC_REMOVE_GRAPHIC_CURSOR);
 }
 			
 // GSX 29: read valuator
@@ -625,41 +555,50 @@ void GSX::set_writing_mode() {
 	if (writing_mode < WM_REPLACE || writing_mode > WM_ERASE) {
 		writing_mode = WM_REPLACE;
 	}
-	send_parameter(OPC_WRITING_MODE, writing_mode);
+	send_params(OPC_WRITING_MODE, 1, writing_mode);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = writing_mode;
 }
 			
 // GSX 33: set input mode
 void GSX::set_input_mode() {
-	Serial1.print(CSI_PRIVATE);
-	Serial1.print(OPC_INPUT_MODE);
-	Serial1.print(';');
-	Serial1.print(intin[0]);
-	Serial1.print(';');
-	Serial1.print(intin[1]);
-	Serial1.print('G');
+	send_array_params(OPC_INPUT_MODE,2,intin,0);
 	contrl[CONTRL_INTOUT] = 1;
 	intout[0] = intin[1];
 }
 
-void GSX::send_parameter(int16 opcode, int16 parameter) {
-	Serial1.print(CSI_PRIVATE);
-	Serial1.print(opcode);
-	Serial1.print(';');
-	Serial1.print(parameter);
-	Serial1.print('G');
+void GSX::send_array_params(int16 opcode, int16 nElements, int16 *array, int16 count, ...) {
+	va_list vl;
+	int tries = 3;
+	do {
+		va_start(vl,count);
+		serialPort->print(CSI_PRIVATE);
+		serialPort->print(opcode);
+		for (int16 i=0; i<count; ++i) {
+			serialPort->print(';');
+			serialPort->print(va_arg(vl,int));
+		}
+		for (int16 i=0; i<nElements; ++i) {
+			serialPort->print(';');
+			serialPort->print(array[i]);
+		}
+		va_end(vl);
+		serialPort->print('G');
+	} while( !serialPort->find("G") && --tries>0 );
 }
 
-void GSX::send_parameters(int16 opcode, int16 *parameters, int16 nParameters) {
-	Serial1.print(CSI_PRIVATE);
-	Serial1.print(opcode);
-	while (nParameters > 0) {
-		Serial1.print(';');
-		Serial1.print(*parameters);
-		++parameters;
-		--nParameters;
-	}
-	Serial1.print('G');
+void GSX::send_params(int16 opcode, int16 count, ...) {
+	va_list vl;
+	int tries = 3;
+	do {
+		va_start(vl,count);
+		serialPort->print(CSI_PRIVATE);
+		serialPort->print(opcode);
+		for (int16 i=0; i<count; ++i) {
+			serialPort->print(';');
+			serialPort->print(va_arg(vl,int));
+		}
+		va_end(vl);
+		serialPort->print('G');
+	} while( !serialPort->find("G") && --tries>0 );
 }
-

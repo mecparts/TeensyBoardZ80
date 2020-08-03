@@ -4,6 +4,8 @@
 	#ifdef __cplusplus
 		#include "Arduino.h"
 	#endif
+	#include <stdarg.h>
+	#include <HardwareSerial.h>
 
 	typedef signed char		int8;
 	typedef signed short		int16;
@@ -121,7 +123,7 @@
 	};
 	
 	enum {
-		CONTROL_FUNCTIONID = 5,
+		CONTRL_FUNCTIONID = 5,
 	};
 	
 	enum {	
@@ -244,7 +246,7 @@
 	#ifdef __cplusplus
 	class GSX {
 		public:
-			GSX(void);
+			GSX(HardwareSerial *_serialPort);
 			void begin(void);
 			void open_workstation(void);
 			void close_workstation(void);
@@ -285,7 +287,7 @@
 			int16*	ptsin;
 			int16*	intout;
 			int16*	ptsout;
-			int16		int_ptsin[MAX_PTSIN * 2 + 2]; // allow one extra vertice to close polygon
+			int16		dev_ptsin[MAX_PTSIN * 2 + 2]; // allow one extra vertice to close polygon
 			int16		maxX, maxY;
 
 			int16 ndc_to_dev(long ndc, long dev_min, long dev_max) {
@@ -295,10 +297,12 @@
 				return (dev - dev_min) * GSX_MAX_NDC / (dev_max - dev_min);
 			};
 		private:
-			void send_parameter(int16 opcode, int16 parameter);
-			void send_parameters(int16 opcode, int16 *params, int16 nParams);
+			void send_params(int16 opcode, int16 count, ...);
+			void send_array_params(int16 opcode, int16 nElements, int16 *array, int16 count, ...);
 			void place_graphic_cursor(int16 x, int16 y);
 			void remove_graphic_cursor();
+
+			HardwareSerial *serialPort;
 	};
 	#endif
 
