@@ -1102,6 +1102,7 @@ void _modeminit(uint16 iotab) {
 			MODEMPORT.begin(newBaud);
 		}
 	}
+	MODEMPORT.clear();
 }
 #else
 // return 1 if a character is ready from the modem input, 0 otherwise
