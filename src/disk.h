@@ -260,6 +260,28 @@ void _copyDirAttrsToFCB(CPM_DIRENTRY* DE) {
 	}
 }
 
+void _insertTimeStamp( uint16_t addr, uint16 dt, uint16 tm ) {
+	tmElements_t te;
+	time_t tt;
+	uint16 days;
+	uint8 i;
+
+	te.Year = CalendarYrToTm(FS_YEAR(dt));
+	te.Month = FS_MONTH(dt);
+	te.Day = FS_DAY(dt);
+	te.Hour = FS_HOUR(tm);
+	te.Minute = FS_MINUTE(tm);
+	te.Second = 0;
+	tt = makeTime(te);
+
+	days = tt / SECS_PER_DAY - DAYS_OFFSET_CPM_TO_UNIX;
+	_RamWrite16(addr, days);
+	i = bin2bcd(hour(tt));
+	_RamWrite(addr+2, i);
+	i = bin2bcd(minute(tt));
+	_RamWrite(addr+3, i);
+}
+
 // Creates a fake directory entry for the current dmaAddr FCB
 void _mockupDirEntry(void) {
 	CPM_DIRENTRY* DE = (CPM_DIRENTRY*)_RamSysAddr(dmaAddr);
@@ -269,8 +291,17 @@ void _mockupDirEntry(void) {
 		_RamWrite(dmaAddr + i, 0x00); // zero out directory entry
 	}
 	_HostnameToFCB(dmaAddr, (uint8*)findNextDirName);
-
 	_copyDirAttrsToFCB(DE);
+	// add P2DOS style create and modify timestamps
+	_RamWrite(dmaAddr + 0x20, 0xE5);
+	_RamWrite(dmaAddr + 0x40, 0xE5);
+	_RamWrite(dmaAddr + 0x60, 0x21);
+	_insertTimeStamp(dmaAddr + 0x61, 
+		bytes2uint16(fileDirEntry.createDate),
+		bytes2uint16(fileDirEntry.createTime));
+	_insertTimeStamp(dmaAddr + 0x65, 
+		bytes2uint16(fileDirEntry.modifyDate),
+		bytes2uint16(fileDirEntry.modifyTime));
 	
 	if (allUsers) {
 		DE->dr = currFindUser; // set user code for return
