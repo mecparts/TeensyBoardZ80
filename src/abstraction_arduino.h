@@ -489,6 +489,7 @@ uint8 _findnext(uint8 isdir) {
 	uint8 result = 0xff;
 	bool isfile;
 	uint32 bytes;
+	bool isPublicFile;
 
 	digitalWrite(LED, HIGH ^ LEDinv);
 	if (allExtents && fileRecords) {
@@ -500,11 +501,12 @@ uint8 _findnext(uint8 isdir) {
 			isfile = !f.isDirectory();
 			bytes = f.size();
 			f.dirEntry(&fileDirEntry);
+			isPublicFile = fileDirEntry.attributes & FAT_ATTRIB_HIDDEN;
 			f.close();
 			if (!isfile)
 				continue;
 			_HostnameToFCBname(findNextDirName, fcbname);
-			if (match(fcbname, pattern)) {
+			if (match(fcbname, pattern) && (!publicOnly || isPublicFile)) {
 				if (isdir) {
 					// account for host files that aren't multiples of the block size
 					// by rounding their bytes up to the next multiple of blocks
@@ -590,7 +592,6 @@ uint8 _findfirstallusers(uint8 isdir) {
 	if (userdir)
 		userdir.close();
 	rootdir = SD.open((char*)path); // Set directory search to start from the first position
-	strcpy((char*)pattern, "???????????");
 	if (!rootdir)
 		return 0xFF;
 	fileRecords = 0;

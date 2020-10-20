@@ -225,6 +225,7 @@ static uint16	loginVector = 0;
 static int16	bdosFunc = -1;
 static uint8	allUsers = FALSE;	// true when dr is '?' in BDOS search first
 static uint8	allExtents = FALSE; // true when ex is '?' in BDOS search first
+static bool		publicOnly = FALSE;	// true when searching for only a public file
 static uint8	currFindUser = 0;	// user number of current directory in BDOS search first on all user numbers
 static uint8	blockShift;			// disk allocation block shift
 static uint8	blockMask;			// disk allocation block mask

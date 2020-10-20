@@ -470,6 +470,7 @@ uint16 _SearchFirst(uint16 fcbaddr, uint8 isdir) {
 	CPM_FCB* F = (CPM_FCB*)_RamSysAddr(fcbaddr);
 	uint16 result = 0xff;
 
+	publicOnly = false;
 	result = _SelectDisk(F->dr, fcbaddr);
 	if (!result) {
 		if (!getZsdosErrorMode() || !(F->s1 >= 0x80 && F->s1 <= 0x8F)) {
@@ -479,9 +480,15 @@ uint16 _SearchFirst(uint16 fcbaddr, uint8 isdir) {
 		allUsers = F->dr == '?';
 		allExtents = F->ex == '?';
 		if (allUsers) {
+			strcpy((char*)pattern, "???????????");
 			result = _findfirstallusers(isdir);
 		} else {
 			result = _findfirst(isdir);
+			if (result == 0xFF && isdir) {
+				allUsers = true;
+				publicOnly = true;
+				result = _findfirstallusers(isdir);
+			}
 		}
 	}
 	return result;
