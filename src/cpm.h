@@ -63,13 +63,13 @@ void _PatchCPM(void) {
 #endif
 
 		// Patches in the BIOS jump destinations
-		for (i = 0; i < 0x45; i = i + 3) {
+		for (i = 0; i < (numBIOScalls * 3); i = i + 3) {
 			_RamWrite(BIOSjmppage + i, JP);
 			_RamWrite16(BIOSjmppage + i + 1, BIOSpage + i);
 		}
 
 		// Patches in the BIOS page content
-		for (i = 0; i < 0x45; i = i + 3) {
+		for (i = 0; i < (numBIOScalls * 3); i = i + 3) {
 			_RamWrite(BIOSpage + i, OUTa);
 			_RamWrite(BIOSpage + i + 1, i & 0xff);
 			_RamWrite(BIOSpage + i + 2, RET);
@@ -115,6 +115,24 @@ void _PatchCPM(void) {
 			}
 		}
 		physicalExtentBytes = logicalExtentBytes * (extentMask + 1);
+
+		// Patch CP/M (fake) Disk Parameter Header 
+		i = DPHaddr;
+		_RamWrite16(i, 0);
+		++i; ++i;
+		_RamWrite16(i, 0);
+		++i; ++i;
+		_RamWrite16(i, 0);
+		++i; ++i;
+		_RamWrite16(i, 0);
+		++i; ++i;
+		_RamWrite16(i, DirBufAddr);
+		++i; ++i;
+		_RamWrite16(i, DPBaddr);
+		++i; ++i;
+		_RamWrite16(i, 0);
+		++i; ++i;
+		_RamWrite16(i, SCBaddr);
 
 		uint16 c;
 
@@ -616,7 +634,11 @@ void _Bios(void) {
 	case 0x18:					// 8 - HOME - Home disk head
 		break;
 	case 0x1B:					// 9 - SELDSK - Select disk drive
-		HL = 0x0000;
+		if (LOW_REGISTER(BC) <= (MAXDSK-'A')) {
+			HL = DPHaddr;
+		} else {
+			HL = 0x0000;
+		}
 		break;
 	case 0x1E:					// 10 - SETTRK - Set track number
 		Serial.print("BIOS - SETTRK - "); Serial.println(LOW_REGISTER(BC));

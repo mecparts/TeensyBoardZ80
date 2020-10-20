@@ -190,10 +190,15 @@ static uint8 RAM[MEMSIZE];
 #define MAXDSK		'F'
 #define MAXUSR		15
 
+#define numBIOScalls 23
 #define BIOSpage		(BIOS_TOP - 256)
 #define BIOSjmppage	(BIOSpage - 256)
 #define DPBaddr	(BIOSpage + 256 - 16)	// Address of the Disk Parameters Block (Hardcoded in BIOS)
-
+#define DPHaddr   (DPBaddr - 16)
+#define DirBufAddr (DPHaddr - 128)
+#if (BIOSpage + numBIOScalls * 3) > DirBufAddr
+#error Collision between BIOS jumps and DirBuf
+#endif
 
 // BDOS Pages (depend on CPMSIZE)
 #define BDOSsize		0x0E00
