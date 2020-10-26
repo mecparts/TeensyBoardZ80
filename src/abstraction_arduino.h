@@ -671,11 +671,11 @@ void _putcrt(uint8 ch) {
 }
 
 #define KEY_TIMEOUT 5
-#define FIFO_LNG 16
+#define FIFO_LNG 32
 static uint8 keyFifo[FIFO_LNG];
 static uint8 escNumber;
 static int fifoCount = 0,fifoHead = 0, fifoTail = 0;
-enum EscStateType { NOT_IN_SEQ, SAW_ESC, SAW_BRACE, SAW_O, SAW_NUMBER, SAW_8_OR_9, SAW_SEMICOLON, SAW_5 } escState = NOT_IN_SEQ;
+enum EscStateType { NOT_IN_SEQ, SAW_ESC, SAW_BRACE, SAW_2ND_BRACE, SAW_O, SAW_NUMBER, SAW_8_OR_9, SAW_SEMICOLON, SAW_5 } escState = NOT_IN_SEQ;
 
 // Implement a Finite State Machine to translate VT100/ANSI cursor
 // key sequences to WordStar equivalents. This has the major advantage
@@ -780,10 +780,74 @@ int _kbhit(void) {
 								escNumber = c;
 								escState = SAW_NUMBER;
 								break;
+							case '[':
+								escState = SAW_2ND_BRACE;
+								break;
 							default:
 								escState = NOT_IN_SEQ;
 								break;
 						}
+						break;
+					case SAW_2ND_BRACE:
+						switch( c ) {
+							case 'A':
+								fifoCount -= 4;
+								fifoTail = (fifoTail - 4 + FIFO_LNG) % FIFO_LNG;
+								{
+									time_t now = Teensy3Clock.get();
+									uint16 yr = year(now);
+									uint8 mon = month(now) - 1;
+									uint8 dy = day(now);
+									char dateStr[10];
+									static const char *monthNames[] = {
+										"Jan","Feb","Mar","Apr","May","Jun",
+										"Jul","Aug","Sep","Oct","Nov","Dec"
+									};
+									snprintf(
+										dateStr, 
+										sizeof dateStr, 
+										"%s %u/%02u", 
+										monthNames[mon], 
+										dy, yr % 100);
+									uint8_t i = 0;
+									while( dateStr[i] ) {
+										keyFifo[fifoTail] = dateStr[i++];
+										fifoTail = (fifoTail + 1) % FIFO_LNG;
+										++fifoCount;
+									}
+								}
+								break;
+							case 'B':
+								fifoCount -= 4;
+								fifoTail = (fifoTail - 4 + FIFO_LNG) % FIFO_LNG;
+								{
+									time_t now = Teensy3Clock.get();
+									uint16 hh = hour(now);
+									uint8 mm = minute(now);
+									char ampm = 'a';
+									char timeStr[9];
+									if( hh >= 12 ) {
+										hh -= 12;
+										ampm = 'p';
+									}
+									if( hh == 0 ) {
+										hh = 12;
+									}
+									snprintf(
+										timeStr, sizeof timeStr, 
+										"%u:%02u %cm", hh, mm, ampm);
+									uint8_t i = 0;
+									while( timeStr[i] ) {
+										keyFifo[fifoTail] = timeStr[i++];
+										fifoTail = (fifoTail + 1) % FIFO_LNG;
+										++fifoCount;
+									}
+								}
+								break;
+							default:
+								break;
+						}
+						escState = NOT_IN_SEQ;
 						break;
 					case SAW_O:
 						if (c == 'F') {	// <esc> O F - END key
