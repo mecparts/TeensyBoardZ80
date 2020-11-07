@@ -696,26 +696,11 @@ int _kbhit(void) {
 		// console AND handy when a terminal program
 		// is talking on a hardware serial port to a
 		// system that expects an ANSI terminal)
-		//
-		// (unless of course that terminal program is
-		// ZMP and swallows the ESC character sent by
-		// the cursor key - curses, foiled again)
 		if (TERMINALPORT.available()) {
 			c = TERMINALPORT.read();
 			keyFifo[fifoTail] = c;
 			fifoTail = (fifoTail + 1) % FIFO_LNG;
 			++fifoCount;
-			if (c == '\x1b') {
-				timeout = millis() + KEY_TIMEOUT;
-				do {
-					if (TERMINALPORT.available()) {
-						keyFifo[fifoTail] = '\x1b';
-						fifoTail = (fifoTail + 1) % FIFO_LNG;
-						++fifoCount;
-						break;
-					}
-				} while (millis() < timeout);
-			}
 		}
 	} else {
 		do {
