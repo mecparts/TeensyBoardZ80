@@ -673,15 +673,11 @@ void _putcrt(uint8 ch) {
 #define KEY_TIMEOUT 5
 #define FIFO_LNG 32
 static uint8 keyFifo[FIFO_LNG];
-static uint8 escNumber;
 static int fifoCount = 0,fifoHead = 0, fifoTail = 0;
-enum EscStateType { NOT_IN_SEQ, SAW_ESC, SAW_BRACE, SAW_2ND_BRACE, SAW_O, SAW_NUMBER, SAW_8_OR_9, SAW_SEMICOLON, SAW_5 } escState = NOT_IN_SEQ;
+enum EscStateType { NOT_IN_SEQ, SAW_ESC, SAW_BRACE, SAW_2ND_BRACE } escState = NOT_IN_SEQ;
 
-// Implement a Finite State Machine to translate VT100/ANSI cursor
-// key sequences to WordStar equivalents. This has the major advantage
-// of EVERYTHING that understand WS sequences just working with the
-// cursor keypad. ZCPR3.3 utilities of all kinds, DazzleStar, Turbo
-// Pascal, ZDE, you name it.
+// Implement a Finite State Machine to translate <F1> and <F2> to the
+// current date and time strings.
 //
 // This routine works fine on Arduino style platforms, but porting it
 // to Linux wasn't straightforward. There seemed to be problems timing
@@ -694,7 +690,7 @@ int _kbhit(void) {
 	uint32_t timeout = 0;
 
 	if (getNovaDosFlags() & HiInFlag) {
-		// turn off cursor key escape processing
+		// turn off key escape processing
 		// when inputting 8 bit characters
 		// (needed for file transfers through the
 		// console AND handy when a terminal program
@@ -738,48 +734,12 @@ int _kbhit(void) {
 					case SAW_ESC:
 						if (c == '[') {
 							escState = SAW_BRACE;
-						} else if (c == 'O') {
-							escState = SAW_O;
 						} else {
 							escState = NOT_IN_SEQ;
 						}
 						break;
 					case SAW_BRACE:
 						switch (c) {
-							case 'A':		// up arrow key
-							case 'B':		// down arrow key
-							case 'C':		// right arrow key
-							case 'D':		// left arrow key
-								fifoCount -= 3;
-								fifoTail = (fifoTail - 3 + FIFO_LNG) % FIFO_LNG;
-								switch (c) {
-									case 'A':	// line up
-										keyFifo[fifoTail] = 'E' - '@';
-										break;
-									case 'B':	// line down
-										keyFifo[fifoTail] = 'X' - '@';
-										break;
-									case 'C':	// char right
-										keyFifo[fifoTail] = 'D' - '@';
-										break;
-									case 'D':	// char left
-										keyFifo[fifoTail] = 'S' - '@';
-										break;
-								}
-								fifoTail = (fifoTail + 1) % FIFO_LNG;
-								++fifoCount;
-								escState = NOT_IN_SEQ;
-								break;
-
-							case '1':		// HOME key
-							case '2':		// INSERT key
-							case '3':		// DELETE key
-							case '4':		// END key
-							case '5':		// PAGE UP key
-							case '6':		// PAGE DOWN key
-								escNumber = c;
-								escState = SAW_NUMBER;
-								break;
 							case '[':
 								escState = SAW_2ND_BRACE;
 								break;
@@ -846,129 +806,6 @@ int _kbhit(void) {
 								break;
 							default:
 								break;
-						}
-						escState = NOT_IN_SEQ;
-						break;
-					case SAW_O:
-						if (c == 'F') {	// <esc> O F - END key
-							fifoCount -= 3;
-							fifoTail = (fifoTail - 3 + FIFO_LNG) % FIFO_LNG;
-							keyFifo[fifoTail] = 'Q' - '@';	
-							fifoTail = (fifoTail + 1) % FIFO_LNG;
-							++fifoCount;
-							keyFifo[fifoTail] = 'D';	// ^QD end of line
-							fifoTail = (fifoTail + 1) % FIFO_LNG;
-							keyFifo[(fifoTail + 1) % FIFO_LNG] = 'D';
-							++fifoCount;
-						}
-						escState = NOT_IN_SEQ;
-						break;
-					case SAW_NUMBER:
-						if (c == '~') {			// <esc> [ N ~
-							switch (escNumber) {
-								case '1':	// HOME key
-									fifoCount -= 4;
-									fifoTail = (fifoTail - 4 + FIFO_LNG) % FIFO_LNG;
-									keyFifo[fifoTail] = 'Q' - '@';
-									fifoTail = (fifoTail + 1) % FIFO_LNG;
-									++fifoCount;
-									keyFifo[fifoTail] = 'S';	// ^QS start of line
-									fifoTail = (fifoTail + 1) % FIFO_LNG;
-									++fifoCount;
-									break;
-								case '2':	// INSERT key
-									fifoCount -= 4;
-									fifoTail = (fifoTail - 4 + FIFO_LNG) % FIFO_LNG;
-									keyFifo[fifoTail] = 'V' - '@';	// insert on/of
-									fifoTail = (fifoTail + 1) % FIFO_LNG;
-									++fifoCount;
-									break;
-								case '3':	// DELETE key
-									fifoCount -= 4;
-									fifoTail = (fifoTail - 4 + FIFO_LNG) % FIFO_LNG;
-									keyFifo[fifoTail] = 'G' - '@';	// del char under cursor
-									fifoTail = (fifoTail + 1) % FIFO_LNG;
-									++fifoCount;
-									break;
-								case '4':	// END key
-									fifoCount -= 4;
-									fifoTail = (fifoTail - 4 + FIFO_LNG) % FIFO_LNG;
-									keyFifo[fifoTail] = 'Q' - '@';
-									fifoTail = (fifoTail + 1) % FIFO_LNG;
-									++fifoCount;
-									keyFifo[fifoTail] = 'D';	// ^QD end of line
-									fifoTail = (fifoTail + 1) % FIFO_LNG;
-									++fifoCount;
-									break;
-								case '5':	// PAGE UP key
-									fifoCount -= 4;
-									fifoTail = (fifoTail - 4 + FIFO_LNG) % FIFO_LNG;
-									keyFifo[fifoTail] = 'R' - '@';	// page up
-									fifoTail = (fifoTail + 1) % FIFO_LNG;
-									++fifoCount;
-									break;
-								case '6':	// PAGE DOWN key
-									fifoCount -= 4;
-									fifoTail = (fifoTail - 4 + FIFO_LNG) % FIFO_LNG;
-									keyFifo[fifoTail] = 'C' - '@';	// page down
-									fifoTail = (fifoTail + 1) % FIFO_LNG;
-									++fifoCount;
-									break;
-							}
-							escState = NOT_IN_SEQ;
-						} else if ((c == '8' || c == '9') && escNumber == '1') {
-							escNumber = c;
-							escState = SAW_8_OR_9;
-						} else if (c == ';' && escNumber == '1') {
-							escState = SAW_SEMICOLON;
-						} else {
-							escState = NOT_IN_SEQ;
-						}
-						break;
-					case SAW_SEMICOLON:
-						if (c == '5') {
-							escState = SAW_5;
-						} else {
-							escState = NOT_IN_SEQ;
-						}
-						break;
-					case SAW_8_OR_9:
-						if (c == '~') {
-							fifoCount -= 5;
-							fifoTail = (fifoTail - 5 + FIFO_LNG) % FIFO_LNG;
-							keyFifo[fifoTail] = 'K' - '@';
-							fifoTail = (fifoTail + 1) % FIFO_LNG;
-							++fifoCount;
-							if (escNumber == '8') {
-								keyFifo[fifoTail] = 'B';	// <F7> - block begin
-							} else {
-								keyFifo[fifoTail] = 'K';	// <F8> - block end
-							}
-							fifoTail = (fifoTail + 1) % FIFO_LNG;
-							++fifoCount;
-						}
-						escState = NOT_IN_SEQ;
-						break;
-					case SAW_5:
-						if (c >= 'A' && c <= 'D') {	// <esc> [ 1 ; 5 A, B, C or D
-							fifoCount -= 6;
-							fifoTail = (fifoTail - 6 + FIFO_LNG) % FIFO_LNG;
-							switch (c) {
-								case 'A':	// <ctrl>up arrow - scroll up
-									keyFifo[fifoTail] = 'W' - '@';
-									break;
-								case 'B':	// <ctrl>down arrow - scroll down
-									keyFifo[fifoTail] = 'Z' - '@';
-									break;
-								case 'C':	// <ctrl>right arrow - word right
-									keyFifo[fifoTail] = 'F' - '@';
-									break;
-								case 'D':	// <ctrlleft arrow - word left
-									keyFifo[fifoTail] = 'A' - '@';
-									break;
-							}
-							fifoTail = (fifoTail + 1) % FIFO_LNG;
-							++fifoCount;
 						}
 						escState = NOT_IN_SEQ;
 						break;

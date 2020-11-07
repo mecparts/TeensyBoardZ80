@@ -144,6 +144,7 @@ void setup(void) {
 	_puts(", ZSDOS 1.1\r\n");
 	_puts("Based on RunCPM by Marcelo Dantas\r\n");
 	_puts("Arduino read/write support by Krzysztof Klis\r\n");
+   _puts("\x1b[#1w");   // Set PiGFX keyboard into Wordstar mode
 
 	if (SD.begin(SDINIT)) {
 #if defined USE_GSX
