@@ -575,24 +575,10 @@ void _Bios(void) {
 		Status = WBOOT;		// 1 - WBOOT - Back to CCP
 		break;
 	case 0x06:					// 2 - CONST - Console status
-		switch (_RamRead(IOBYTE) & 0b00000011) {
-			case 0:	// 00: TTY:
-				SET_HIGH_REGISTER(AF, _ttyist());
-				break;
-			default:	// 01: CRT:
-				SET_HIGH_REGISTER(AF, _crtist());
-				break;
-		}
+		SET_HIGH_REGISTER(AF, _conist());
 		break;
 	case 0x09:					// 3 - CONIN - Console input
-		switch (_RamRead(IOBYTE) & 0b00000011) {
-			case 0:	// 00: TTY:
-				SET_HIGH_REGISTER(AF, _gettty());
-				break;
-			default:	// 01: CRT:
-				SET_HIGH_REGISTER(AF, _getcrt());
-				break;
-		}
+		SET_HIGH_REGISTER(AF, _getcon());
 #ifdef DEBUG
 		if (HIGH_REGISTER(AF) == 4)
 			Debug = 1;
@@ -603,33 +589,16 @@ void _Bios(void) {
 		if (!(getNovaDosFlags() & HiOutFlag)) {
 			c &= 0x7F;
 		}
-		switch (_RamRead(IOBYTE) & 0b00000011) {
-			case 0:	// 00: TTY:
-				_puttty(c);
-				break;
-			default:	// 01: CRT:
-				_putcrt(c);
-				break;
-		}
+		_putcon(c);
 		break;
 	case 0x0F:					// 5 - LIST - List output
-		switch (_RamRead(IOBYTE) & 0b11000000) {
-			case 0b00000000:
-				_puttty(LOW_REGISTER(BC));
-				break;
-			case 0b01000000:
-				_putcrt(LOW_REGISTER(BC));
-				break;
-			default:
-				_putlpt(LOW_REGISTER(BC));
-				break;
-		}
+		_putlst(LOW_REGISTER(BC));
 		break;
 	case 0x12:					// 6 - PUNCH/AUXOUT - Punch output
-		_puttty(LOW_REGISTER(BC));
+		_putpun(LOW_REGISTER(BC));
 		break;
 	case 0x15:					// 7 - READER - Reader input
-		SET_HIGH_REGISTER(AF, _gettty());
+		SET_HIGH_REGISTER(AF, _getrdr());
 		break;
 	case 0x18:					// 8 - HOME - Home disk head
 		break;
@@ -641,35 +610,25 @@ void _Bios(void) {
 		}
 		break;
 	case 0x1E:					// 10 - SETTRK - Set track number
-		Serial.print("BIOS - SETTRK - "); Serial.println(LOW_REGISTER(BC));
+		TERMINALPORT.print("BIOS - SETTRK - "); TERMINALPORT.println(LOW_REGISTER(BC));
 		break;
 	case 0x21:					// 11 - SETSEC - Set sector number
-		Serial.print("BIOS - SETSEC - "); Serial.println(LOW_REGISTER(BC));
+		TERMINALPORT.print("BIOS - SETSEC - "); TERMINALPORT.println(LOW_REGISTER(BC));
 		break;
 	case 0x24:					// 12 - SETDMA - Set DMA address
 		HL = BC;
 		dmaAddr = BC;
 		break;
 	case 0x27:					// 13 - READ - Read selected sector
-		Serial.println("BIOS - READ");
+		TERMINALPORT.println("BIOS - READ");
 		SET_HIGH_REGISTER(AF, 0x00);
 		break;
 	case 0x2A:					// 14 - WRITE - Write selected sector
-		Serial.println("BIOS - WRITE");
+		TERMINALPORT.println("BIOS - WRITE");
 		SET_HIGH_REGISTER(AF, 0x00);
 		break;
 	case 0x2D:					// 15 - LISTST - Get list device status
-		switch (_RamRead(IOBYTE) & 0b11000000) {
-			case 0b00000000:
-				SET_HIGH_REGISTER(AF, _ttyost());
-				break;
-			case 0b01000000:
-				SET_HIGH_REGISTER(AF, _crtost());
-				break;
-			default:
-				SET_HIGH_REGISTER(AF, _lptst());
-				break;
-		}
+		SET_HIGH_REGISTER(AF, _lstst());
 		break;
 	case 0x30:					// 16 - SECTRAN - Sector translate
 		HL = BC;					// HL=BC=No translation (1:1)
@@ -680,21 +639,14 @@ void _Bios(void) {
 	case 0x36:					// 18 - MODEMINIT - serial port configuration
 		_modeminit(BC);
 		break;
-	case 0x39:					// 19 - TTYIST - TTY input (RDR:) status
-		HL = _ttyist();
+	case 0x39:					// 19 - RDRIST - RDR: input status
+		HL = _rdrist();
 		break;
-	case 0x3C:						// 20 - TTYOST - TTY output (PUN:) status:
-		HL = _ttyost();
+	case 0x3C:					// 20 - PUNOST - PUN: output status:
+		HL = _punost();
 		break;
 	case 0x3F:					// 21 - CONPEEK - console input peek
-		switch (_RamRead(IOBYTE) & 0b00000011) {
-			case 0b00000000:	// 00: TTY:
-				SET_HIGH_REGISTER(AF, _peektty());
-				break;
-			default:	// 01: CRT:
-				SET_HIGH_REGISTER(AF, _peekcrt());
-				break;
-		}
+		SET_HIGH_REGISTER(AF, _peekcon());
 		break;
 	case 0x42:					// 22 - DELAY
 		_delay(BC);
@@ -738,7 +690,7 @@ void _Bdos(void) {
 			// C = 0 : System reset
 			// Doesn't return. Reloads CP/M
 			//
-			Serial.println("BDOS - WBOOT");
+			TERMINALPORT.println("BDOS - WBOOT");
 			Status = CBOOT;	// Same as call to "BOOT"
 			break;
 
@@ -748,7 +700,7 @@ void _Bdos(void) {
 			// Gets a char from the console
 			// Returns: A=Char
 			//
-			Serial.println("BDOS - CONIN");
+			TERMINALPORT.println("BDOS - CONIN");
 			Status = CBOOT;	// Same as call to "BOOT"
 			break;
 
@@ -758,7 +710,7 @@ void _Bdos(void) {
 			// E = Char
 			// Sends the char in E to the console
 			//
-			Serial.println("BDOS - CONOUT");
+			TERMINALPORT.println("BDOS - CONOUT");
 			Status = CBOOT;	// Same as call to "BOOT"
 			break;
 
@@ -767,31 +719,21 @@ void _Bdos(void) {
 			// C = 3 : Auxiliary (Reader) input
 			// Returns: A=Char
 			//
-			HL = _gettty();
+			HL = _getrdr();
 			break;
 
 		case 4:
 			//
 			// C = 4 : Auxiliary (Punch) output
 			//
-			_puttty(LOW_REGISTER(DE));
+			_putpun(LOW_REGISTER(DE));
 			break;
 
 		case 5:
 			//
 			// C = 5 : Printer output
 			//
-			switch (_RamRead(IOBYTE) & 0b11000000) {
-				case 0b00000000:
-					_puttty(LOW_REGISTER(DE));
-					break;
-				case 0b01000000:
-					_putcrt(LOW_REGISTER(DE));
-					break;
-				default:
-					_putlpt(LOW_REGISTER(DE));
-					break;
-			}
+			_putlst(LOW_REGISTER(DE));
 			break;
 
 		case 6:
@@ -802,7 +744,7 @@ void _Bdos(void) {
 			// E = char : Outputs char (write)
 			// Returns: A=Char or 0x00 (on read)
 			//
-			Serial.println("BDOS - DCONIO");
+			TERMINALPORT.println("BDOS - DCONIO");
 			Status = CBOOT;	// Same as call to "BOOT"
 			break;
 
@@ -830,7 +772,7 @@ void _Bdos(void) {
 			// DE = Address of string
 			// Sends the $ terminated string pointed by (DE) to the screen
 			//
-			Serial.println("BDOS - STROUT");
+			TERMINALPORT.println("BDOS - STROUT");
 			Status = CBOOT;	// Same as call to "BOOT"
 			break;
 
@@ -842,7 +784,7 @@ void _Bdos(void) {
 			// Returns: A = Number os chars read
 			//          DE = First char
 			//
-			Serial.println("BDOS - RDBUFF");
+			TERMINALPORT.println("BDOS - RDBUFF");
 			Status = CBOOT;	// Same as call to "BOOT"
 			break;
 
@@ -851,7 +793,7 @@ void _Bdos(void) {
 			// C = 11 (0Bh) : Get console status
 			// Returns: A=0x00 or 0xFF
 			//
-			Serial.println("BDOS - CONST");
+			TERMINALPORT.println("BDOS - CONST");
 			Status = CBOOT;	// Same as call to "BOOT"
 			break;
 

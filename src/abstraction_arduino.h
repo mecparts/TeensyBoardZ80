@@ -842,9 +842,9 @@ void _clrscr(void) {
 
 // modem support
 #if defined MODEMPORT
-// return 1 if a character is ready from the modem input, 0 otherwise
+// return FF if a character is ready from the modem input, 0 otherwise
 uint8 _ttyist() {
-	return (uint8)(MODEMPORT.available() ? 1 : 0);
+	return (uint8)(MODEMPORT.available() ? 0xFF : 0);
 }
 
 // wait for and return a character from the modem
@@ -1062,6 +1062,36 @@ uint8 _lptst(void) {
 	return 0xFF;
 }
 #endif
+
+// return FF if a character is ready from the user input, 0 otherwise
+uint8 _usr1ist() {
+	return (uint8)(USR1PORT.available() ? 0xFF : 0);
+}
+
+// wait for and return a character from the user input
+uint8 _getusr1() {
+	while (!USR1PORT.available() );
+	return USR1PORT.read();
+}
+
+// return 1 if a character can be sent to the user output, 0 otherwise
+uint8 _usr1ost() {
+	return USR1PORT.availableForWrite() ? 0xFF : 0x00;
+}
+
+// send a character to the user output (discard)
+void _putusr1(uint8 c) {
+	USR1PORT.write(c);
+}
+
+uint8 _peekusr1() {
+	int c = USR1PORT.peek();
+	if (c == -1) {
+		return (char)0;
+	} else {
+		return (char)c;
+	}
+}
 
 // delay # of ms
 void _delay(uint16 ms) {

@@ -65,10 +65,12 @@ uint32 modemSpeed = MODEMSPD;
 #define STARTUP_DELAY   3000
 #define TERMINALRTS 2
 
+#define USR1PORT Serial
+
 #include "abstraction_arduino.h"
 
 #include "ram.h"
-#include "console.h"
+#include "logical_io.h"
 #include "cpu.h"
 #include "disk.h"
 #include "host.h"
