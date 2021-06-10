@@ -661,13 +661,8 @@ void _putcrt(uint8 ch) {
 #if defined BEEPER
 	if (ch == '\a') {
 		tone(BEEPER, 800, 200);
-	} else 
-#endif
-	if (ch == '\x0e') { // SO - 8 bit output
-		setNovaDosFlags(getNovaDosFlags() | HiOutFlag);
-	} else if (ch == '\x0f') { // SI - 7 bit output
-		setNovaDosFlags(getNovaDosFlags() & ~HiOutFlag);
 	}
+#endif
 }
 
 #define KEY_TIMEOUT 5
