@@ -241,8 +241,9 @@ enum NovaDOSflags {
 	//CtrlSFlag = 1<<1,
 	HiInFlag = 1<<2,
 	HiOutFlag = 1<<3,
-	PubROFlag = 1<<4
-	//RbldVecFlag = 1<<5
+	PubROFlag = 1<<4,
+	//RbldVecFlag = 1<<5,
+	LockFlag = 1<<6
 };
 #define setNovaDosFlags(x) _RamWrite(novaDosFlagsByte,x)
 #define getNovaDosFlags() _RamRead(novaDosFlagsByte)

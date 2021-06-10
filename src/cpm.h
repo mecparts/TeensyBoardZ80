@@ -1254,9 +1254,11 @@ void _Bdos(void) {
 			// C = 230 (E6h) : Set 8 bit masking
 			//
 			if (LOW_REGISTER(DE) == 0xFF) {
-				setNovaDosFlags(getNovaDosFlags() | HiOutFlag);		// allow 8 bit output
+				// allow 8 bit output and lock it
+				setNovaDosFlags(getNovaDosFlags() | HiOutFlag | LockFlag);
 			} else {
-				setNovaDosFlags(getNovaDosFlags() & ~HiOutFlag);		// allow 8 bit output
+				// allow 7 bit output and unlock it
+				setNovaDosFlags(getNovaDosFlags() & ~HiOutFlag & ~LockFlag);
 			}
 			break;
 

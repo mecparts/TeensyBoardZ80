@@ -44,9 +44,11 @@ uint8 _getcon(void) {
 
 void _putcon(uint8 ch)		// Puts a character
 {
-	if (ch == '\x0e') { // SO - 8 bit output
+	if (ch == '\x0e' && !(getNovaDosFlags() & LockFlag)) {
+		// SO - 8 bit output switch only if not locked by BDOS 230 call
 		setNovaDosFlags(getNovaDosFlags() | HiOutFlag);
-	} else if (ch == '\x0f') { // SI - 7 bit output
+	} else if (ch == '\x0f' && !(getNovaDosFlags() & LockFlag)) {
+		// SI - 7 bit output switch only if not locked by BDOS 230 call
 		setNovaDosFlags(getNovaDosFlags() & ~HiOutFlag);
 	}
 	if (!(getNovaDosFlags() & HiOutFlag)) {
