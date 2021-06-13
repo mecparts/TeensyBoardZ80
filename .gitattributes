@@ -1,0 +1,3 @@
+*.Z80 linguist-language=Assembly
+*.FOR linguist-documentation=false
+*.TOC linguist-documentation=false
