@@ -857,9 +857,9 @@ uint8 _peektty(void) {
 	}
 }
 
-// return 1 if a character can be sent to the modem output, 0 otherwise
+// return FF if a character can be sent to the modem output, 0 otherwise
 uint8 _ttyost(void) {
-	return (uint8)(digitalRead(MODEMCTS) == LOW ? 1 : 0);
+	return MODEMPORT.availableForWrite() ? 0xFF : 0x00;
 }
 
 // send a character to the modem
@@ -987,7 +987,7 @@ void _modeminit(uint16 iotab) {
 	MODEMPORT.clear();
 }
 #else
-// return 1 if a character is ready from the modem input, 0 otherwise
+// return FF if a character is ready from the modem input, 0 otherwise
 uint8 _ttyist() {
 	return 0;				// no char available
 }
@@ -997,9 +997,9 @@ uint8 _gettty() {
 	return (uint8)0x1A;	// EOF
 }
 
-// return 1 if a character can be sent to the modem output, 0 otherwise
+// return FF if a character can be sent to the modem output, 0 otherwise
 uint8 _ttyost() {
-	return (uint8)1;		// go ahead and send (will be discarded)
+	return (uint8)0xFF;		// go ahead and send (will be discarded)
 }
 
 // send a character to the modem (discard)
@@ -1069,7 +1069,7 @@ uint8 _getusr1() {
 	return USR1PORT.read();
 }
 
-// return 1 if a character can be sent to the user output, 0 otherwise
+// return FF if a character can be sent to the user output, 0 otherwise
 uint8 _usr1ost() {
 	return USR1PORT.availableForWrite() ? 0xFF : 0x00;
 }

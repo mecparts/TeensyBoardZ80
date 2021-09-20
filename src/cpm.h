@@ -39,6 +39,9 @@ void _PatchCPM(void) {
 
 	if (firstTime) {
 
+		// Initial MSPEED value - 9600
+		_RamWrite(0x003C, 8);
+
 		//**********  Patch CP/M Version into the memory so the CCP can see it
 #ifdef USE_CIOS
 		// patch in page relocated CIOS

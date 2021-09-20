@@ -24,9 +24,10 @@ SdFat SD;
 #endif
 
 #define MODEMPORT Serial3
-#define MODEMSPD 1200
+#define MODEMSPD 9600
 #define MODEMRTS 18
 #define MODEMCTS 19
+#define MODEMCTSREAD 21
 #define MODEMDATABITS 8
 #define MODEMSTOPBITS 1
 
@@ -85,15 +86,6 @@ void setup(void) {
 	pinMode(LED, OUTPUT);
 	digitalWrite(LED, LOW);
 
-   while (startup_delay > 0) {
-		digitalWrite(LED, HIGH^LEDinv);
-		delay(sDELAY);
-      startup_delay -= sDELAY;
-		digitalWrite(LED, LOW^LEDinv);
-		delay(sDELAY);
-      startup_delay -= sDELAY;
-	}
-   
 	TERMINALPORT.begin(SERIALSPD);
    pinMode(TERMINALRTS, INPUT_PULLDOWN);
 	while (!TERMINALPORT) {	// Wait until serial is connected
@@ -112,6 +104,7 @@ void setup(void) {
 		TERMINALPORT.println("Could not attach CTS.");
 		return;
 	}
+	pinMode(MODEMCTSREAD, INPUT);
 #endif
 
 #ifdef LPT_PORT
@@ -123,6 +116,15 @@ void setup(void) {
 	_writeI2Cregister(LPT_IODIRB, LPT_BUSY);	// /BUSY is an input; all others out
 #endif
 		
+   while (startup_delay > 0) {
+		digitalWrite(LED, HIGH^LEDinv);
+		delay(sDELAY);
+      startup_delay -= sDELAY;
+		digitalWrite(LED, LOW^LEDinv);
+		delay(sDELAY);
+      startup_delay -= sDELAY;
+	}
+   
 #ifdef DEBUGLOG
 	_sys_deletefile((uint8 *)LogName);
 #endif
