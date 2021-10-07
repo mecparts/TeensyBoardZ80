@@ -591,9 +591,6 @@ void _Bios(void) {
 		break;
 	case 0x0C:					// 4 - CONOUT - Console output
 		c = LOW_REGISTER(BC);
-		if (!(getNovaDosFlags() & HiOutFlag)) {
-			c &= 0x7F;
-		}
 		_putcon(c);
 		break;
 	case 0x0F:					// 5 - LIST - List output
