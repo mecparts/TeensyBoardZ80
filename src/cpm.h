@@ -255,7 +255,7 @@ void _PatchCPM(void) {
 			_RamWrite(i++,terminal[c]);
 			++c;
 		}
-		_RamWrite(i++, 0x54);			// graphics offset
+		_RamWrite(i++, 0x56);			// graphics offset
 		_RamWrite(i++, 0x80);			// config byte B14
 		_RamWrite(i++, 0x10);			// config byte B15
 		_RamWrite(i++, 'E'-'@');		// Cursor UP (Wordstar Defaults)
@@ -268,7 +268,9 @@ void _PatchCPM(void) {
 
 		_RamWrite(i++, 0x1b);			// CL String
 		_RamWrite(i++, '[');
-		_RamWrite(i++, '2');
+		_RamWrite(i++, 'H');
+		_RamWrite(i++, 0x1b);
+		_RamWrite(i++, '[');
 		_RamWrite(i++, 'J');
 		_RamWrite(i++, 0);
 
