@@ -984,6 +984,12 @@ void _modeminit(uint16 iotab) {
 			MODEMPORT.begin(newBaud);
 		}
 	}
+	if( _RamRead(iotab+4) ) {
+		MODEMPORT.attachCts(MODEMCTS);
+	} else {
+		MODEMPORT.attachCts(0xFF);
+		pinMode(MODEMCTS, INPUT);
+	}
 	MODEMPORT.clear();
 }
 #else
